@@ -11,4 +11,4 @@ outputs:
     description: Output from running the command
 runs:
   using: 'node20'
-  main: 'index.js'
+  main: 'dist/index.js'
