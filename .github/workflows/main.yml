@@ -7,7 +7,7 @@ jobs:
     steps:
       - name: Open the env
         id: open
-        uses: komalali/esc-action@v0.1.0
+        uses: komalali/esc-action@v0.1.1
         with:
           environment: pulumi/dev-stacks
       - name: Get the output time
