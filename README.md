@@ -17,7 +17,7 @@ The time the environment was opened.
 ## Example usage
 
 ```yaml
-uses: pulumi/esc-action@e76147da8e5c81eaf017dede5645551d4b94427b
+uses: komalali/esc-action@e76147da8e5c81eaf017dede5645551d4b94427b
 with:
   environment: staging
 ```

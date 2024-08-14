@@ -1,0 +1,14 @@
+on: [push]
+
+jobs:
+  esc_open_job:
+    runs-on: ubuntu-latest
+    name: Open the dev-stacks environment
+    steps:
+      - name: Open the env
+        id: open
+        uses: komalali/esc-action@v0.1.0
+        with:
+          environment: pulumi/dev-stacks
+      - name: Get the output time
+        run: echo "The time was ${{ steps.open.outputs.time }}"
