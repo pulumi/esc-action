@@ -1,0 +1,14 @@
+name: ESC Open Action
+description: Open an ESC environment and project all environment variables to be used in future commands of the workflow
+inputs:
+  environment:
+    description: 'The environment to open'
+    required: true
+outputs:
+  environment:
+    description: 'The environment that was opened'
+  output:
+    description: Output from running the command
+runs:
+  using: 'node20'
+  main: 'index.js'
