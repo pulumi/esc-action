@@ -1,0 +1,11 @@
+name: Pulumi ESC Action
+description: Export environment variables from an ESC environment
+inputs:
+  env-name:
+    description: ESC environment name
+    required: true
+runs:
+  using: docker
+  image: Dockerfile
+  env:
+    INPUT_ENV_NAME: ${{ inputs.env-name }}
