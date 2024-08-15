@@ -1,0 +1,24 @@
+name: Demo
+
+on:
+  - push
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: ESC action
+        uses: pulumi/esc-action@initial-version
+        env:
+          PULUMI_ACCESS_TOKEN: ${{ secrets.DEMO_PULUMI_ACCESS_TOKEN }}
+        with:
+          env-name: temp
+
+      - name: Get values
+        run: |
+          echo "env value: ${{ env.EXAMPLE_VAR }}"
+          echo "env value: ${{ env.EXAMPLE_VAR2 }}"
