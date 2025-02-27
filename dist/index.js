@@ -26198,14 +26198,8 @@ function run() {
             const escVersion = core.getInput('version');
             const environment = core.getInput('environment');
             const keys = core.getInput('keys');
-            const injectAllSpecified = core.getInput('injectAll') !== '';
-            let injectAll = core.getInput('injectAll').toLowerCase() === 'true';
-            // injectAll should be true if no variables are specified, but if any specific keys are specified,
-            // injectAll should be false.
-            if (keys && injectAll) {
-                core.error('Both "keys" and "injectAll" inputs are set, but they are mutually exclusive.');
-            }
-            if (!injectAllSpecified && !keys) {
+            let injectAll = false;
+            if (!keys) {
                 injectAll = true;
             }
             //
@@ -26287,6 +26281,8 @@ function run() {
                             // EOF
                             fs.appendFileSync(envFilePath, `${key}<<EOF\n${value}\nEOF\n`);
                         }
+                        // Signal success
+                        core.info(`Injected ${Object.keys(envObj).length} environment variables`);
                     }
                     core.endGroup();
                 }

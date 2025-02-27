@@ -1,23 +1,27 @@
-# `esc open` action
+# `esc` action
 
-This action opens a Pulumi ESC environment and projects all environment variables into the workflow for use in future commands.
+- Minimally, this action will download the ESC CLI. If a version is specified, that version will be downloaded.
+- Optionally, if an environment is specified, the action will inject all environment variables from the environment into the current action/workflow environment.
+- If only specific keys are passed in using the keys input - only those keys will be injected into the current action.
 
 ## Inputs
 
+### `version`
+
+**Optional** The version of the ESC CLI to download. If not specified, the latest version will be downloaded.
+
 ### `environment`
 
-**Required** The name of the environment to open.
+**Optional** The name of the environment to open. If not specified, the action will not open an environment.
 
-## Outputs
+### `keys`
 
-### `time`
-
-The time the environment was opened.
+**Optional** A comma-separated list of keys to inject into the current action/workflow environment. If not specified, all keys from the environment will be injected.
 
 ## Example usage
 
 ```yaml
-uses: komalali/esc-action@e76147da8e5c81eaf017dede5645551d4b94427b
+uses: pulumi/esc-action@v1
 with:
-  environment: staging
+  environment: my-org/my-project/my-env
 ```
