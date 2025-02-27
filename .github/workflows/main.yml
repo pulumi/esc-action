@@ -1,14 +1,18 @@
 on: [push]
 
 jobs:
-  esc_open_job:
+  test-env-injection:
     runs-on: ubuntu-latest
-    name: Open the dev-stacks environment
     steps:
-      - name: Open the env
-        id: open
-        uses: komalali/esc-action@v0.1.1
+      - name: Install and inject ESC environment variables
+        uses: ./
         with:
-          environment: pulumi/dev-stacks
-      - name: Get the output time
-        run: echo "The time was ${{ steps.open.outputs.time }}"
+          environment: 'pulumi/imports/github-secrets'
+        env:
+          # If needed, set your Pulumi access token or other secrets
+          PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN_PRODUCTION }}
+
+      - name: Verify injection
+        run: |
+          echo "Testing env injection..."
+          echo "NPM_TOKEN=$NPM_TOKEN"

@@ -11,9 +11,10 @@
   "license": "ISC",
   "dependencies": {
     "@actions/core": "^1.10.1",
-    "@actions/github": "^6.0.0"
+    "@actions/exec": "^1.1.1"
   },
   "devDependencies": {
+    "@types/node": "^22.13.5",
     "prettier": "^3.3.3",
     "typescript": "^5.5.4"
   }
