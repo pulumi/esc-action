@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "ncc build src/index.ts -o dist"
   },
   "keywords": [],
   "author": "",
@@ -15,6 +15,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.13.5",
+    "@vercel/ncc": "^0.38.3",
     "prettier": "^3.3.3",
     "typescript": "^5.5.4"
   }
