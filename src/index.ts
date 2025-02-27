@@ -25,31 +25,32 @@ async function run(): Promise<void> {
         //
         // If no version is specified, it installs the latest automatically.
         //
-        const installArgs = ['-fsSL', 'https://get.pulumi.com/esc/install.sh'];
+
 
         // If the CLI is already installed, skip the installation step
         const escPath = path.join(process.env.HOME || '', '.pulumi', 'bin', 'esc');
         if (fs.existsSync(escPath)) {
             core.info('ESC CLI is already installed, skipping installation step.');
-            return;
-        }
-
-        // Build an array of args for the shell to pass to `sh`.
-        const shArgs: string[] = ['-c'];
-        if (escVersion) {
-            shArgs.push(`curl ${installArgs.join(' ')} | sh -s -- --version ${escVersion}`);
         } else {
-            shArgs.push(`curl ${installArgs.join(' ')} | sh`);
+            const installArgs = ['-fsSL', 'https://get.pulumi.com/esc/install.sh'];
+
+            // Build an array of args for the shell to pass to `sh`.
+            const shArgs: string[] = ['-c'];
+            if (escVersion) {
+                shArgs.push(`curl ${installArgs.join(' ')} | sh -s -- --version ${escVersion}`);
+            } else {
+                shArgs.push(`curl ${installArgs.join(' ')} | sh`);
+            }
+
+            // Execute the installation
+            core.startGroup('Installing ESC CLI');
+            await exec.exec('sh', shArgs);
+            core.endGroup();
+
+            // Add $HOME/.pulumi/bin to the PATH so `esc` is available.
+            const pulumiBinPath = path.join(process.env.HOME || '', '.pulumi', 'bin');
+            core.addPath(pulumiBinPath);
         }
-
-        // Execute the installation
-        core.startGroup('Installing ESC CLI');
-        await exec.exec('sh', shArgs);
-        core.endGroup();
-
-        // Add $HOME/.pulumi/bin to the PATH so `esc` is available.
-        const pulumiBinPath = path.join(process.env.HOME || '', '.pulumi', 'bin');
-        core.addPath(pulumiBinPath);
 
         //
         // 3) Inject environment variables if requested
@@ -75,6 +76,8 @@ async function run(): Promise<void> {
                         core.setSecret(secretValue);
                         // Set it as an environment variable
                         core.exportVariable(variable, secretValue);
+                        // Signal success
+                        core.info(`Injected ${variable}`);
                     } else {
                         core.warning(`No value found for environmentVariables.${variable}`);
                     }

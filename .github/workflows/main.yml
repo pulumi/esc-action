@@ -23,8 +23,7 @@ jobs:
           environment: 'pulumi/imports/github-secrets'
         env:
           PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN_PRODUCTION }}
-
       - name: Verify injection
         run: |
           echo "Testing env injection..."
-          echo "COVERAGE_OUTPUT_DIR=COVERAGE_OUTPUT_DIR"
+          echo "COVERAGE_OUTPUT_DIR=$COVERAGE_OUTPUT_DIR"
