@@ -6,15 +6,25 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+      - name: Inject only specific environment variables
+        uses: ./
+        with:
+          environment: 'pulumi/imports/github-secrets'
+          keys: 'NPM_TOKEN,PULUMI_BOT_TOKEN'
+        env:
+          PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN_PRODUCTION }}
+      - name: Verify injection
+        run: |
+          echo "Testing env injection..."
+          echo "NPM_TOKEN=$NPM_TOKEN"
       - name: Install and inject ESC environment variables
         uses: ./
         with:
           environment: 'pulumi/imports/github-secrets'
         env:
-          # If needed, set your Pulumi access token or other secrets
           PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN_PRODUCTION }}
 
       - name: Verify injection
         run: |
           echo "Testing env injection..."
-          echo "NPM_TOKEN=$NPM_TOKEN"
+          echo "COVERAGE_OUTPUT_DIR=COVERAGE_OUTPUT_DIR"
