@@ -1,7 +1,7 @@
 on: [push]
 
 jobs:
-  test-env-injection:
+  test-individual-key-injection:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -16,7 +16,12 @@ jobs:
       - name: Verify injection
         run: |
           echo "Testing env injection..."
-          echo "NPM_TOKEN=$NPM_TOKEN"
+          env
+  test-all-key-injection:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
       - name: Install and inject ESC environment variables
         uses: ./
         with:
@@ -26,4 +31,4 @@ jobs:
       - name: Verify injection
         run: |
           echo "Testing env injection..."
-          echo "COVERAGE_OUTPUT_DIR=$COVERAGE_OUTPUT_DIR"
+          env
