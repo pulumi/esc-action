@@ -26192,9 +26192,7 @@ const path = __importStar(__nccwpck_require__(6928));
 function run() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            //
-            // 1) Parse inputs
-            //
+            // Parse inputs
             const escVersion = core.getInput('version');
             const environment = core.getInput('environment');
             const keys = core.getInput('keys');
@@ -26202,14 +26200,14 @@ function run() {
             if (!keys) {
                 injectAll = true;
             }
-            //
-            // 2) Install ESC CLI (either the latest or a specific version)
-            //
-            // The official installation script supports an optional `--version` argument to pin a release.
-            // e.g. curl -fsSL https://get.pulumi.com/esc/install.sh | sh -s -- --version 0.10.0
-            //
-            // If no version is specified, it installs the latest automatically.
-            //
+            /*
+              Install ESC CLI (either the latest or a specific version)
+            
+              The official installation script supports an optional `--version` argument to pin a release.
+              e.g. curl -fsSL https://get.pulumi.com/esc/install.sh | sh -s -- --version 0.10.0
+              
+              If no version is specified, it installs the latest automatically.
+            */
             // If the CLI is already installed, skip the installation step
             const escPath = path.join(process.env.HOME || '', '.pulumi', 'bin', 'esc');
             if (fs.existsSync(escPath)) {
@@ -26233,8 +26231,7 @@ function run() {
                 const pulumiBinPath = path.join(process.env.HOME || '', '.pulumi', 'bin');
                 core.addPath(pulumiBinPath);
             }
-            //
-            // 3) Inject environment variables if requested
+            // Inject environment variables if requested
             //
             // Check if an environment was provided. If not, skip injection.
             if (environment) {
