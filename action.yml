@@ -1,0 +1,19 @@
+name: esc-action
+description: GitHub Action to install the ESC CLI and inject environment variables from an ESC environment.
+author: Pulumi
+inputs:
+  version:
+    description: 'Version of ESC CLI to install. If omitted, installs the latest.'
+    required: false
+    default: ''
+  environment:
+    description: 'The ESC environment to pull environment variables from.'
+    required: false
+    default: ''
+  keys:
+    description: 'A comma-separated list of specific keys to inject from within the ESC values.environmentVariables object. E.g. "NPM_TOKEN,SLACK_WEBHOOK_URL".'
+    required: false
+    default: ''
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
