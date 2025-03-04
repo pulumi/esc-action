@@ -10,6 +10,7 @@ async function run(): Promise<void> {
         const escVersion: string = core.getInput('version');
         const environment: string = core.getInput('environment');
         const keys: string = core.getInput('keys');
+        const cloudUrl: string = core.getInput('cloud-url');
 
         /*
           Install ESC CLI (either the latest or a specific version)
@@ -42,6 +43,12 @@ async function run(): Promise<void> {
             // Add $HOME/.pulumi/bin to the PATH so `esc` is available.
             const pulumiBinPath = path.join(process.env.HOME || '', '.pulumi', 'bin');
             core.addPath(pulumiBinPath);
+        }
+
+        if (cloudUrl) {
+            // Set the ESC_CLOUD_URL environment variable if provided
+            core.info(`Setting PULUMI_BACKEND_URL to ${cloudUrl}`);
+            process.env.PULUMI_BACKEND_URL = cloudUrl;
         }
 
         // Inject environment variables if requested

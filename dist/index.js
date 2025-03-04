@@ -26351,6 +26351,7 @@ function run() {
             const escVersion = core.getInput('version');
             const environment = core.getInput('environment');
             const keys = core.getInput('keys');
+            const cloudUrl = core.getInput('cloud-url');
             /*
               Install ESC CLI (either the latest or a specific version)
     
@@ -26378,6 +26379,11 @@ function run() {
                 // Add $HOME/.pulumi/bin to the PATH so `esc` is available.
                 const pulumiBinPath = path.join(process.env.HOME || '', '.pulumi', 'bin');
                 core.addPath(pulumiBinPath);
+            }
+            if (cloudUrl) {
+                // Set the ESC_CLOUD_URL environment variable if provided
+                core.info(`Setting PULUMI_BACKEND_URL to ${cloudUrl}`);
+                process.env.PULUMI_BACKEND_URL = cloudUrl;
             }
             // Inject environment variables if requested
             //
