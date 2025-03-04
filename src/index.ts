@@ -52,7 +52,7 @@ async function run(): Promise<void> {
             core.startGroup(`Injecting environment variables from ESC environment: ${environment}`);
             const result = await exec.getExecOutput(
               'esc',
-              ['open', environment, 'environmentVariables', '--format', 'dotenv'],
+              ['open', environment, '--format', 'dotenv'],
               { silent: true }
             );
 
