@@ -26407,13 +26407,11 @@ function run() {
                     }
                 }
                 catch (parseErr) {
-                    core.error(`Failed to parse output: ${parseErr}`);
-                    return;
+                    throw new Error(`Failed to open environment: ${parseErr}`);
                 }
                 const envFilePath = process.env.GITHUB_ENV;
                 if (!envFilePath) {
-                    core.error('GITHUB_ENV is not defined. Cannot append environment variables.');
-                    return;
+                    throw new Error('GITHUB_ENV is not defined. Cannot append environment variables.');
                 }
                 // If user wants to inject specific variables:
                 if (keys) {
