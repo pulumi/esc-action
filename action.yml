@@ -14,10 +14,6 @@ inputs:
     description: 'A comma-separated list of specific keys to inject from within the ESC values.environmentVariables object. E.g. "NPM_TOKEN,SLACK_WEBHOOK_URL".'
     required: false
     default: ''
-  injectAll:
-    description: 'Set to "true" to inject all environment variables from the specified ESC environment.'
-    required: false
-    default: ''
 runs:
   using: 'node20'
   main: 'dist/index.js'

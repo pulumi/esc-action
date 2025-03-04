@@ -26196,16 +26196,12 @@ function run() {
             const escVersion = core.getInput('version');
             const environment = core.getInput('environment');
             const keys = core.getInput('keys');
-            let injectAll = false;
-            if (!keys) {
-                injectAll = true;
-            }
             /*
               Install ESC CLI (either the latest or a specific version)
-            
+    
               The official installation script supports an optional `--version` argument to pin a release.
               e.g. curl -fsSL https://get.pulumi.com/esc/install.sh | sh -s -- --version 0.10.0
-              
+    
               If no version is specified, it installs the latest automatically.
             */
             // If the CLI is already installed, skip the installation step
@@ -26214,15 +26210,12 @@ function run() {
                 core.info('ESC CLI is already installed, skipping installation step.');
             }
             else {
-                const installArgs = ['-fsSL', 'https://get.pulumi.com/esc/install.sh'];
-                // Build an array of args for the shell to pass to `sh`.
-                const shArgs = ['-c'];
+                let cmd = 'curl -fsSL https://get.pulumi.com/esc/install.sh | sh';
                 if (escVersion) {
-                    shArgs.push(`curl ${installArgs.join(' ')} | sh -s -- --version ${escVersion}`);
+                    cmd += ` -s -- --version ${escVersion}`;
                 }
-                else {
-                    shArgs.push(`curl ${installArgs.join(' ')} | sh`);
-                }
+                // Prepare the shell command arguments
+                const shArgs = ['-c', cmd];
                 // Execute the installation
                 core.startGroup('Installing ESC CLI');
                 yield exec.exec('sh', shArgs);
@@ -26254,7 +26247,7 @@ function run() {
                 }
                 // If user wants to inject specific variables:
                 if (keys) {
-                    const variables = keys.split(',').map(v => v.trim()).filter(Boolean);
+                    const variables = keys.split(',').map(v => v.trim());
                     for (const variable of variables) {
                         const value = envObj[variable];
                         if (value) {
@@ -26267,8 +26260,8 @@ function run() {
                         }
                     }
                 }
-                // If user wants to inject all environment variables:
-                if (injectAll) {
+                else {
+                    // If no specific keys are provided, inject all environment variables
                     // For each key/value, mask and write multiline-friendly format
                     for (const [key, value] of Object.entries(envObj)) {
                         // Mask the secret so it doesn't appear in logs
