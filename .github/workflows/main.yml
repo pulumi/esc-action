@@ -1,0 +1,69 @@
+on:
+  - push
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  test-cli-download-only:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Install ESC CLI
+        uses: ./
+      - name: Verify CLI exists
+        run: esc version
+  test-cli-download-specific-version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Install ESC CLI
+        uses: ./
+        with:
+          version: '0.10.0'
+      - name: Verify CLI exists
+        run: esc version
+  test-individual-key-injection:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Authenticate with Pulumi Cloud
+        uses: pulumi/auth-actions@v1
+        with:
+          organization: pulumi
+          requested-token-type: urn:pulumi:token-type:access_token:organization
+          cloud-url: https://api.pulumi-staging.io
+      - name: Inject only specific environment variables
+        uses: ./
+        with:
+          environment: 'pulumi/github/esc-action'
+          keys: 'FOO,SOME_IMPORTANT_KEY'
+      - name: Verify injection
+        run: |
+          echo "Testing env injection..."
+          echo "FOO=$FOO"
+          echo "SOME_IMPORTANT_KEY=$SOME_IMPORTANT_KEY"
+  test-all-key-injection:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Authenticate with Pulumi Cloud
+        uses: pulumi/auth-actions@v1
+        with:
+          organization: pulumi
+          requested-token-type: urn:pulumi:token-type:access_token:organization
+          cloud-url: https://api.pulumi-staging.io
+      - name: Install and inject ESC environment variables
+        uses: ./
+        with:
+          environment: 'pulumi/github/esc-action'
+      - name: Verify injection
+        run: |
+          echo "Testing env injection..."
+          echo "FOO=$FOO"
+          echo "SOME_IMPORTANT_KEY=$SOME_IMPORTANT_KEY"
+          echo "TEST_ENV=$TEST_ENV"
