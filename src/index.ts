@@ -2,6 +2,7 @@ import * as core from '@actions/core';
 import * as exec from '@actions/exec';
 import * as fs from 'fs';
 import * as path from 'path';
+import { lookpath } from 'lookpath';
 
 async function run(): Promise<void> {
     try {
@@ -20,8 +21,8 @@ async function run(): Promise<void> {
         */
 
         // If the CLI is already installed, skip the installation step
-        const escPath = path.join(process.env.HOME || '', '.pulumi', 'bin', 'esc');
-        if (fs.existsSync(escPath)) {
+        const escExists = await lookpath('esc');
+        if (escExists) {
             core.info('ESC CLI is already installed, skipping installation step.');
         } else {
             let cmd = 'curl -fsSL https://get.pulumi.com/esc/install.sh | sh';
@@ -51,16 +52,25 @@ async function run(): Promise<void> {
             core.startGroup(`Injecting environment variables from ESC environment: ${environment}`);
             const result = await exec.getExecOutput(
               'esc',
-              ['open', environment, 'environmentVariables'],
+              ['open', environment, 'environmentVariables', '--format', 'dotenv'],
               { silent: true }
             );
 
-            // Parse the JSON into an object
+            // Parse the output
             let envObj: Record<string, string> = {};
             try {
-                envObj = JSON.parse(result.stdout);
+                // The output is in the format KEY="VALUE"
+                // We need to convert it to an object
+                const lines = result.stdout.split('\n');
+                for (const line of lines) {
+                    const [key, value] = line.split('=');
+                    if (key && value) {
+                        // Remove quotes from the value
+                        envObj[key.trim()] = value.replace(/(^"|"$)/g, '').trim();
+                    }
+                }
             } catch (parseErr) {
-                core.error(`Failed to parse JSON output: ${parseErr}`);
+                core.error(`Failed to parse output: ${parseErr}`);
                 return;
             }
 
