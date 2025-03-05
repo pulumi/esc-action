@@ -61,6 +61,8 @@ env:
 
 ### Full example using pulumi/auth-actions for authentication
 
+It is recommended to use the [pulumi/auth-actions](https://github.com/pulumi/auth-actions) action to authenticate with the Pulumi Cloud API. This action will automatically set the `PULUMI_ACCESS_TOKEN` environment variable for you.
+
 ```yaml
 on:
   - pull_request
