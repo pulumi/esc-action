@@ -1,5 +1,7 @@
 name: esc-action
 description: GitHub Action to install the ESC CLI and inject environment variables from an ESC environment.
+icon: unlock
+color: purple
 author: Pulumi
 inputs:
   version:
