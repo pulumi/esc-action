@@ -69,7 +69,7 @@ jobs:
         with:
           # This action uses the https://app.pulumi-staging.io/pulumi/esc/github/esc-action environment
           environment: 'pulumi/github/esc-action'
-          cloud-url: https://api.pulumi-staging.io
+#          cloud-url: https://api.pulumi-staging.io
       - name: Verify injection
         run: |
           echo "Testing env injection..."
