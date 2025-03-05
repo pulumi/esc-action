@@ -60,8 +60,13 @@ async function run(): Promise<void> {
             const result = await exec.getExecOutput(
               'esc',
               ['open', environment, '--format', 'dotenv'],
-              { silent: true }
+              { silent: true, ignoreReturnCode: true }
             );
+
+            if (result.exitCode !== 0) {
+                throw new Error(`\`esc open\` command failed:
+${result.stderr}`)
+            }
 
             // Parse the output
             let envObj: Record<string, string> = {};

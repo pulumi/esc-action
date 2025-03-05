@@ -26391,7 +26391,11 @@ function run() {
             if (environment) {
                 // Open the environment.
                 core.startGroup(`Injecting environment variables from ESC environment: ${environment}`);
-                const result = yield exec.getExecOutput('esc', ['open', environment, '--format', 'dotenv'], { silent: true });
+                const result = yield exec.getExecOutput('esc', ['open', environment, '--format', 'dotenv'], { silent: true, ignoreReturnCode: true });
+                if (result.exitCode !== 0) {
+                    throw new Error(`\`esc open\` command failed:
+${result.stderr}`);
+                }
                 // Parse the output
                 let envObj = {};
                 try {
