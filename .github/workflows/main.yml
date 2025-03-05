@@ -1,0 +1,83 @@
+on:
+  - pull_request
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  test-cli-download-only:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Install ESC CLI
+        uses: ./
+      - name: Verify CLI exists
+        run: esc version
+  test-cli-download-specific-version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Install ESC CLI
+        uses: ./
+        with:
+          version: '0.10.0'
+      - name: Verify CLI exists
+        run: esc version
+  test-individual-key-injection:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Authenticate with Pulumi Cloud
+        uses: pulumi/auth-actions@v1
+        with:
+          organization: pulumi
+          requested-token-type: urn:pulumi:token-type:access_token:organization
+          cloud-url: https://api.pulumi-staging.io
+      - name: Inject only specific environment variables
+        uses: ./
+        with:
+          environment: 'pulumi/github/esc-action'
+          keys: 'FOO,SOME_IMPORTANT_KEY'
+          cloud-url: https://api.pulumi-staging.io
+      - name: Verify injection
+        run: |
+          echo "Testing env injection..."
+          REQUIRED_VARS=("FOO" "SOME_IMPORTANT_KEY")
+          for var in "${REQUIRED_VARS[@]}"; do
+            if [[ -z "${!var}" ]]; then
+              echo "Error: $var is not set or empty" >&2
+              exit 1
+            fi
+            echo "$var is set to: ${!var}"
+          done
+  test-all-key-injection:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Authenticate with Pulumi Cloud
+        uses: pulumi/auth-actions@v1
+        with:
+          organization: pulumi
+          requested-token-type: urn:pulumi:token-type:access_token:organization
+          cloud-url: https://api.pulumi-staging.io
+      - name: Install and inject ESC environment variables
+        uses: ./
+        with:
+          # This action uses the https://app.pulumi-staging.io/pulumi/esc/github/esc-action environment
+          environment: 'pulumi/github/esc-action'
+          cloud-url: https://api.pulumi-staging.io
+      - name: Verify injection
+        run: |
+          echo "Testing env injection..."
+          REQUIRED_VARS=("FOO" "SOME_IMPORTANT_KEY" "TEST_ENV")
+          for var in "${REQUIRED_VARS[@]}"; do
+            if [[ -z "${!var}" ]]; then
+              echo "Error: $var is not set or empty" >&2
+              exit 1
+            fi
+            echo "$var is set to: ${!var}"
+          done
