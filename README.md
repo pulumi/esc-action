@@ -1,8 +1,10 @@
-# `esc` action
+# Pulumi ESC action
 
-- Minimally, this action will download the ESC CLI. If a version is specified, that version will be downloaded.
+[Pulumi ESC](https://www.pulumi.com/docs/esc/) (Environments, Secrets, and Configuration) allows teams to tackle secrets and configuration complexity for modern cloud environments, alleviating maintenance burden and reducing costly mistakes, and creating a “secure by default” posture.
+
+- Minimally, this action will download the Pulumi ESC CLI. If a version is specified, that version will be downloaded.
 - Optionally, if an environment is specified, the action will inject all environment variables from the environment into the current action/workflow environment.
-- If only specific keys are passed in using the keys input - only those keys will be injected into the current action.
+- If specific keys are passed in using the keys input - only those keys will be injected into the current action.
 
 ## Inputs
 
