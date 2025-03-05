@@ -14,6 +14,10 @@ inputs:
     description: 'A comma-separated list of specific keys to inject from within the ESC values.environmentVariables object. E.g. "NPM_TOKEN,SLACK_WEBHOOK_URL".'
     required: false
     default: ''
+  cloud-url:
+    description: 'The URL of the Pulumi Cloud API. Defaults to https://api.pulumi.com.'
+    required: false
+    default: 'https://api.pulumi.com'
 runs:
   using: 'node20'
   main: 'dist/index.js'

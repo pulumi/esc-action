@@ -10,6 +10,7 @@ async function run(): Promise<void> {
         const escVersion: string = core.getInput('version');
         const environment: string = core.getInput('environment');
         const keys: string = core.getInput('keys');
+        const cloudUrl: string = core.getInput('cloud-url');
 
         /*
           Install ESC CLI (either the latest or a specific version)
@@ -44,6 +45,12 @@ async function run(): Promise<void> {
             core.addPath(pulumiBinPath);
         }
 
+        if (cloudUrl) {
+            // Set the ESC_CLOUD_URL environment variable if provided
+            core.info(`Setting PULUMI_BACKEND_URL to ${cloudUrl}`);
+            process.env.PULUMI_BACKEND_URL = cloudUrl;
+        }
+
         // Inject environment variables if requested
         //
         // Check if an environment was provided. If not, skip injection.
@@ -70,14 +77,12 @@ async function run(): Promise<void> {
                     }
                 }
             } catch (parseErr) {
-                core.error(`Failed to parse output: ${parseErr}`);
-                return;
+                throw new Error(`Failed to open environment: ${parseErr}`);
             }
 
             const envFilePath = process.env.GITHUB_ENV;
             if (!envFilePath) {
-                core.error('GITHUB_ENV is not defined. Cannot append environment variables.');
-                return;
+                throw new Error('GITHUB_ENV is not defined. Cannot append environment variables.');
             }
 
             // If user wants to inject specific variables:
