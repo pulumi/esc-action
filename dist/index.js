@@ -26394,10 +26394,7 @@ function run() {
                 const result = yield exec.getExecOutput('esc', ['open', environment, '--format', 'dotenv'], { silent: true, ignoreReturnCode: true });
                 if (result.exitCode !== 0) {
                     throw new Error(`\`esc open\` command failed:
-Exit Code: ${result.exitCode}
-Stderr: ${result.stderr}
-Stdout: ${result.stdout}
-`);
+${result.stderr}`);
                 }
                 // Parse the output
                 let envObj = {};

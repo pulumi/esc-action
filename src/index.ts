@@ -65,10 +65,7 @@ async function run(): Promise<void> {
 
             if (result.exitCode !== 0) {
                 throw new Error(`\`esc open\` command failed:
-Exit Code: ${result.exitCode}
-Stderr: ${result.stderr}
-Stdout: ${result.stdout}
-`);
+${result.stderr}`)
             }
 
             // Parse the output
