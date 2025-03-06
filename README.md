@@ -2,7 +2,9 @@
 
 [Pulumi ESC](https://www.pulumi.com/docs/esc/) makes it easy to share Environments, Secrets and Configuration with your team. It solves the problem of outdated .env files, secrets sprawl caused by copy/pasting from one system to another and secure access to shared services. Pulumi ESC fits seamlessly into any developer workflow with support for popular secret stores, short-lived OIDC tokens and integrations for popular developer tools and CI/CD platforms. 
 
-For example, you may have a CI/CD pipeline that builds, tests and deploys your application. You may need API keys, Cloud provider credentials, or other secrets to be able to test and release your application. You can use this action to securely inject those secrets directly into the GitHub Action workflow where they are needed, without needing to store them separately. Additionally, with ESC's support for dynamic credentials and secret rotation, you can be sure that the secrets you are injecting are valid at the time of use, but are automatically expired after a certain time period.
+For example, you may have a CI/CD pipeline that builds, tests and deploys your application. You may need API keys, Cloud provider credentials, or other secrets to be able to test and release your application. You can use this action to securely inject those secrets directly into the GitHub Action workflow where they are needed, without needing to store them separately. 
+
+With ESC's support for dynamic credentials and automatic secret rotation, you can be sure that the secrets you are injecting are valid at the time of use, but are automatically expired after a certain time period.
 
 ## Functionality
 
