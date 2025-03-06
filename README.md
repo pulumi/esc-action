@@ -1,10 +1,15 @@
 # Pulumi ESC action
 
-[Pulumi ESC](https://www.pulumi.com/docs/esc/) (Environments, Secrets, and Configuration) allows teams to tackle secrets and configuration complexity for modern cloud environments, alleviating maintenance burden and reducing costly mistakes, and creating a “secure by default” posture.
+[Pulumi ESC](https://www.pulumi.com/docs/esc/) makes it easy to share Environments, Secrets and Configuration with your team. It solves the problem of outdated .env files, secrets sprawl caused by copy/pasting from one system to another and secure access to shared services. Pulumi ESC fits seamlessly into any developer workflow with support for popular secret stores, short-lived OIDC tokens and integrations for popular developer tools and CI/CD platforms. 
 
-- Minimally, this action will download the Pulumi ESC CLI. If a version is specified, that version will be downloaded.
-- Optionally, if an environment is specified, the action will inject all environment variables from the environment into the current action/workflow environment.
-- If specific keys are passed in using the keys input - only those keys will be injected into the current action.
+For example, you may have a CI/CD pipeline that builds, tests and deploys your application. You may need API keys, Cloud provider credentials, or other secrets to be able to test and release your application. You can use this action to securely inject those secrets directly into the GitHub Action workflow where they are needed, without needing to store them separately. Additionally, with ESC's support for dynamic credentials and secret rotation, you can be sure that the secrets you are injecting are valid at the time of use, but are automatically expired after a certain time period.
+
+## Functionality
+
+- If no inputs are passed, this action will download the latest version of the Pulumi ESC CLI for direct use in later steps of the workflow. 
+- If a version is specified, that specific version of the CLI will be downloaded.
+- If an `environment` is is passed in as an input, the action will inject all environment variables (specifically the keys under `values.environmentVariables` and projected files under `values.files`) from the environment into the current action/workflow environment.
+- If specific keys are passed in using the `keys` input - only those keys from the `values.environmentVariables` or `values.files` objects will be injected into the current action.
 
 ## Inputs
 
