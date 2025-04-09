@@ -28283,6 +28283,7 @@ function run() {
             const environment = core.getInput('environment');
             const keys = core.getInput('keys');
             const cloudUrl = core.getInput('cloud-url');
+            const exportVars = core.getInput('export-environment-variables') === "" ? true : core.getBooleanInput('export-environment-variables');
             /*
               Install ESC CLI (either the latest or a specific version)
     
@@ -28302,14 +28303,14 @@ function run() {
             // Check if an environment was provided. If not, skip injection.
             if (environment) {
                 // Open the environment.
-                core.startGroup(`Injecting environment variables from ESC environment: ${environment}`);
+                core.startGroup(`Opening ESC environment: ${environment}`);
                 const result = yield exec.getExecOutput('esc', ['open', environment, '--format', 'dotenv'], { silent: true, ignoreReturnCode: true });
                 if (result.exitCode !== 0) {
                     throw new Error(`\`esc open\` command failed:
 ${result.stderr}`);
                 }
                 // Parse the output
-                let envObj = {};
+                let dotenv = {};
                 try {
                     // The output is in the format KEY="VALUE"
                     // We need to convert it to an object
@@ -28318,38 +28319,33 @@ ${result.stderr}`);
                         const [key, value] = line.split('=');
                         if (key && value) {
                             // Remove quotes from the value
-                            envObj[key.trim()] = value.replace(/(^"|"$)/g, '').trim();
+                            dotenv[key.trim()] = value.replace(/(^"|"$)/g, '').trim();
                         }
                     }
                 }
                 catch (parseErr) {
                     throw new Error(`Failed to open environment: ${parseErr}`);
                 }
-                const envFilePath = process.env.GITHUB_ENV;
-                if (!envFilePath) {
-                    throw new Error('GITHUB_ENV is not defined. Cannot append environment variables.');
-                }
-                // If user wants to inject specific variables:
-                if (keys) {
-                    const variables = keys.split(',').map(v => v.trim());
-                    for (const variable of variables) {
-                        const value = envObj[variable];
-                        if (value) {
-                            core.setSecret(value);
-                            fs.appendFileSync(envFilePath, `${variable}<<EOF\n${value}\nEOF\n`);
-                            core.info(`Injected ${variable}`);
-                        }
-                        else {
-                            core.warning(`No value found for environmentVariables.${variable}`);
-                        }
-                    }
-                }
-                else {
-                    // If no specific keys are provided, inject all environment variables
-                    // For each key/value, mask and write multiline-friendly format
-                    for (const [key, value] of Object.entries(envObj)) {
+                const envVars = {};
+                const variables = keys ? keys.split(',').map(v => v.trim()) : Object.keys(dotenv);
+                for (const key of variables) {
+                    const value = dotenv[key];
+                    if (value) {
                         // Mask the secret so it doesn't appear in logs
                         core.setSecret(value);
+                        envVars[key] = value;
+                        core.setOutput(key, value);
+                    }
+                    else {
+                        core.warning(`No value found for environmentVariables.${key}`);
+                    }
+                }
+                if (exportVars) {
+                    const envFilePath = process.env.GITHUB_ENV;
+                    if (!envFilePath) {
+                        throw new Error('GITHUB_ENV is not defined. Cannot append environment variables.');
+                    }
+                    for (const [key, value] of Object.entries(envVars)) {
                         // Append in multiline syntax to handle any newlines safely
                         // e.g.: MY_ENV_VAR<<EOF
                         // line1
@@ -28357,8 +28353,7 @@ ${result.stderr}`);
                         // EOF
                         fs.appendFileSync(envFilePath, `${key}<<EOF\n${value}\nEOF\n`);
                     }
-                    // Signal success
-                    core.info(`Injected ${Object.keys(envObj).length} environment variables`);
+                    core.info(`Injected ${Object.keys(envVars).length} environment variables`);
                 }
                 core.endGroup();
             }

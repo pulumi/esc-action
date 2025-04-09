@@ -21,6 +21,10 @@ inputs:
     description: 'The URL of the Pulumi Cloud API. Defaults to https://api.pulumi.com.'
     required: false
     default: 'https://api.pulumi.com'
+  export-environment-variables:
+    description: "Whether or not to export environment variables. All environment variables will always be available in the 'env' step output."
+    required: false
+    default: true
 runs:
   using: 'node20'
   main: 'dist/index.js'
