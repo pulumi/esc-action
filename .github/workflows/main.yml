@@ -6,7 +6,8 @@ permissions:
 
 jobs:
   test-cli-download-only:
-    runs-on: ubuntu-latest
+    strategy: {matrix: {os: [ubuntu-latest, windows-latest]}}
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -15,7 +16,8 @@ jobs:
       - name: Verify CLI exists
         run: esc version
   test-cli-download-specific-version:
-    runs-on: ubuntu-latest
+    strategy: {matrix: {os: [ubuntu-latest, windows-latest]}}
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -26,7 +28,8 @@ jobs:
       - name: Verify CLI exists
         run: esc version
   test-individual-key-injection:
-    runs-on: ubuntu-latest
+    strategy: {matrix: {os: [ubuntu-latest]}}
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -54,7 +57,8 @@ jobs:
             echo "$var is set to: ${!var}"
           done
   test-all-key-injection:
-    runs-on: ubuntu-latest
+    strategy: {matrix: {os: [ubuntu-latest]}}
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4

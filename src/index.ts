@@ -1,13 +1,69 @@
 import * as core from '@actions/core';
 import * as exec from '@actions/exec';
+import * as io from '@actions/io';
+import * as tc from '@actions/tool-cache';
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
-import { lookpath } from 'lookpath';
+
+async function getInstalledVersion(): Promise<string | undefined> {
+    const installed = await io.which('esc');
+    if (!installed) {
+        return undefined;
+    }
+
+    // Return version without 'v' prefix
+    const { exitCode, stdout } = await exec.getExecOutput('esc', ['version']);
+    if (exitCode === 0 && stdout.trim().startsWith('v')) {
+        return stdout.trim().substring(1);
+    }
+}
+
+async function install(version: string): Promise<void> {
+    const installedVersion = await getInstalledVersion();
+    if (installedVersion === version) {
+        core.info('ESC CLI is already installed, skipping installation step.');
+        return;
+    }
+
+    core.startGroup(`Installing ESC CLI v${version}`);
+    if (installedVersion) {
+        core.info(`Already-installed ESC CLI is not version ${version}`);
+    }
+
+    const tmp = fs.mkdtempSync("esc-");
+
+    const destination = path.join(os.homedir(), '.pulumi', 'bin');
+    core.info(`Install destination is ${destination}`);
+
+    await io.mkdirP(destination);
+    core.debug(`Successfully created ${destination}`);
+
+    const [platform, arch, ext] = core.platform.platform === "win32" ? ["windows", "x64", "zip"] : [core.platform.platform, core.platform.arch, "tar.gz"];
+    const downloadURL = `https://get.pulumi.com/esc/releases/esc-v${version}-${platform}-${arch}.${ext}`;
+    core.info(`downloading ${downloadURL}`);
+    const downloaded = await tc.downloadTool(downloadURL);
+    core.info(`successfully downloaded ${downloadURL} to ${downloaded}`);
+
+    const [extract, bin, srcDir] = platform === "windows" ? [tc.extractZip, 'esc.exe', 'bin'] : [tc.extractTar, 'esc', ''];
+    const extractedPath = await extract(downloaded, tmp);
+    core.info(`Successfully extracted ${downloaded} to ${extractedPath}`);
+    const oldPath = path.join(tmp, 'esc', srcDir, bin);
+    const newPath = path.join(destination, bin);
+    await io.cp(oldPath, newPath);
+    await io.rmRF(oldPath);
+    core.info(`Successfully moved ${oldPath} to ${newPath}`);
+
+    const cachedPath = await tc.cacheDir(destination, 'esc', version);
+    core.addPath(cachedPath);
+
+    core.endGroup();
+}
 
 async function run(): Promise<void> {
     try {
         // Parse inputs
-        const escVersion: string = core.getInput('version');
+        const escVersion: string = core.getInput('version') || await fetch("https://www.pulumi.com/esc/latest-version").then(r => r.text()).then(t => t.trim());
         const environment: string = core.getInput('environment');
         const keys: string = core.getInput('keys');
         const cloudUrl: string = core.getInput('cloud-url');
@@ -20,30 +76,7 @@ async function run(): Promise<void> {
 
           If no version is specified, it installs the latest automatically.
         */
-
-        // If the CLI is already installed, skip the installation step
-        const escExists = await lookpath('esc');
-        if (escExists) {
-            core.info('ESC CLI is already installed, skipping installation step.');
-        } else {
-            let cmd = 'curl -fsSL https://get.pulumi.com/esc/install.sh | sh';
-
-            if (escVersion) {
-                cmd += ` -s -- --version ${escVersion}`;
-            }
-
-            // Prepare the shell command arguments
-            const shArgs = ['-c', cmd];
-
-            // Execute the installation
-            core.startGroup('Installing ESC CLI');
-            await exec.exec('sh', shArgs);
-            core.endGroup();
-
-            // Add $HOME/.pulumi/bin to the PATH so `esc` is available.
-            const pulumiBinPath = path.join(process.env.HOME || '', '.pulumi', 'bin');
-            core.addPath(pulumiBinPath);
-        }
+        await install(escVersion);
 
         if (cloudUrl) {
             // Set the ESC_CLOUD_URL environment variable if provided
@@ -58,9 +91,9 @@ async function run(): Promise<void> {
             // Open the environment.
             core.startGroup(`Injecting environment variables from ESC environment: ${environment}`);
             const result = await exec.getExecOutput(
-              'esc',
-              ['open', environment, '--format', 'dotenv'],
-              { silent: true, ignoreReturnCode: true }
+                'esc',
+                ['open', environment, '--format', 'dotenv'],
+                { silent: true, ignoreReturnCode: true }
             );
 
             if (result.exitCode !== 0) {
