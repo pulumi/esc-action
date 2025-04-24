@@ -7,6 +7,41 @@ import * as os from 'os';
 import * as path from 'path';
 import { env } from 'process';
 
+function getInput(name: string, envVar: string, required?: boolean): string | undefined {
+    const val = core.getInput(name) || env[`ESC_ACTION_${envVar}`];
+    if (!val && required) {
+        throw new Error(`Input or environment variable required and not supplied: ${name} (${envVar})`);
+    }
+    return val;
+}
+
+function parseBooleanValue(val: string): boolean {
+    const trueValue = ['true', 'True', 'TRUE'];
+    const falseValue = ['false', 'False', 'FALSE'];
+    if (trueValue.includes(val)) {
+        return true;
+    }
+    if (falseValue.includes(val)) {
+        return false;
+    }
+
+    throw new TypeError(`Value does not meet YAML 1.2 "Core Schema" specification\n` +
+        `Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
+}
+
+function getBooleanInput(name: string, envVar: string, required?: boolean): boolean | undefined {
+    const val = getInput(name, envVar, required);
+    if (val === undefined) {
+        return undefined;
+    }
+    return parseBooleanValue(val);
+}
+
+function getExportEnvironmentVariables(): boolean {
+    const exportVars = getBooleanInput('export-environment-variables', 'EXPORT_ENVIRONMENT_VARIABLES');
+    return exportVars === undefined ? true : exportVars;
+}
+
 async function getInstalledVersion(): Promise<string | undefined> {
     const installed = await io.which('esc');
     if (!installed) {
@@ -18,6 +53,8 @@ async function getInstalledVersion(): Promise<string | undefined> {
     if (exitCode === 0 && stdout.trim().startsWith('v')) {
         return stdout.trim().substring(1);
     }
+
+    return undefined;
 }
 
 async function install(version: string): Promise<void> {
@@ -32,7 +69,7 @@ async function install(version: string): Promise<void> {
         core.info(`Already-installed ESC CLI is not version ${version}`);
     }
 
-    const tmp = fs.mkdtempSync("esc-");
+    const tmp = fs.mkdtempSync('esc-');
 
     const destination = path.join(os.homedir(), '.pulumi', 'bin');
     core.info(`Install destination is ${destination}`);
@@ -40,13 +77,13 @@ async function install(version: string): Promise<void> {
     await io.mkdirP(destination);
     core.debug(`Successfully created ${destination}`);
 
-    const [platform, arch, ext] = core.platform.platform === "win32" ? ["windows", "x64", "zip"] : [core.platform.platform, core.platform.arch, "tar.gz"];
+    const [platform, arch, ext] = core.platform.platform === 'win32' ? ['windows', 'x64', 'zip'] : [core.platform.platform, core.platform.arch, 'tar.gz'];
     const downloadURL = `https://get.pulumi.com/esc/releases/esc-v${version}-${platform}-${arch}.${ext}`;
     core.info(`downloading ${downloadURL}`);
     const downloaded = await tc.downloadTool(downloadURL);
     core.info(`successfully downloaded ${downloadURL} to ${downloaded}`);
 
-    const [extract, bin, srcDir] = platform === "windows" ? [tc.extractZip, 'esc.exe', 'bin'] : [tc.extractTar, 'esc', ''];
+    const [extract, bin, srcDir] = platform === 'windows' ? [tc.extractZip, 'esc.exe', 'bin'] : [tc.extractTar, 'esc', ''];
     const extractedPath = await extract(downloaded, tmp);
     core.info(`Successfully extracted ${downloaded} to ${extractedPath}`);
     const oldPath = path.join(tmp, 'esc', srcDir, bin);
@@ -64,11 +101,11 @@ async function install(version: string): Promise<void> {
 async function run(): Promise<void> {
     try {
         // Parse inputs
-        const escVersion: string = core.getInput('version') || await fetch("https://www.pulumi.com/esc/latest-version").then(r => r.text()).then(t => t.trim());
-        const environment: string = core.getInput('environment');
-        const keys: string = core.getInput('keys');
-        const cloudUrl: string = core.getInput('cloud-url');
-        const exportVars = core.getInput('export-environment-variables') === "" ? true : core.getBooleanInput('export-environment-variables');
+        const escVersion: string = getInput('version', 'VERSION') || await fetch('https://www.pulumi.com/esc/latest-version').then(r => r.text()).then(t => t.trim());
+        const environment = getInput('environment', 'ENVIRONMENT', true)!;
+        const keys = getInput('keys', 'KEYS');
+        const cloudUrl = getInput('cloud-url', 'CLOUD_URL') || "";
+        const exportVars = getExportEnvironmentVariables();
 
         /*
           Install ESC CLI (either the latest or a specific version)
@@ -110,7 +147,7 @@ ${result.stderr}`)
                 // We need to convert it to an object
                 const lines = result.stdout.split('\n');
                 for (const line of lines) {
-                    const [key, value] = line.split('=');
+                    const [key, value] = line.split('=', 2);
                     if (key && value) {
                         // Remove quotes from the value
                         dotenv[key.trim()] = value.replace(/(^"|"$)/g, '').trim();

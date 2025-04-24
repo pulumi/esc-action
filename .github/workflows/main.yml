@@ -141,6 +141,40 @@ jobs:
             env
             exit 1
           fi
+  test-envvars-individual-key-injection:
+    strategy: {matrix: {os: [ubuntu-latest]}}
+    runs-on: ${{ matrix.os }}
+    env:
+      ESC_ACTION_ENVIRONMENT: pulumi/github/esc-action
+      ESC_ACTION_KEYS: FOO,SOME_IMPORTANT_KEY
+      ESC_ACITON_CLOUD_URL: https://api.pulumi-staging.io
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Authenticate with Pulumi Cloud
+        uses: pulumi/auth-actions@v1
+        with:
+          organization: pulumi
+          requested-token-type: urn:pulumi:token-type:access_token:organization
+          cloud-url: https://api.pulumi-staging.io
+      - name: Install and inject ESC environment variables
+        uses: ./
+      - name: Verify injection
+        run: |
+          echo "Testing env injection..."
+          REQUIRED_VARS=("FOO" "SOME_IMPORTANT_KEY")
+          for var in "${REQUIRED_VARS[@]}"; do
+            if [[ -z "${!var}" ]]; then
+              echo "Error: $var is not set or empty" >&2
+              exit 1
+            fi
+            echo "$var is set to: ${!var}"
+          done
+          if [[ -n $(env | grep "^TEST_ENV=") ]]; then
+            echo "Error: unexpected variables are set" >&2
+            env
+            exit 1
+          fi
   test-all-key-injection:
     strategy: {matrix: {os: [ubuntu-latest]}}
     runs-on: ${{ matrix.os }}
