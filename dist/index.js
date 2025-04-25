@@ -28314,7 +28314,7 @@ function run() {
             const escVersion = getInput('version', 'VERSION') || (yield fetch('https://www.pulumi.com/esc/latest-version').then(r => r.text()).then(t => t.trim()));
             const environment = getInput('environment', 'ENVIRONMENT');
             const keys = getInput('keys', 'KEYS');
-            const cloudUrl = getInput('cloud-url', 'CLOUD_URL') || "";
+            const cloudUrl = getInput('cloud-url', 'CLOUD_URL') || 'https://api.pulumi.com';
             const exportVars = getExportEnvironmentVariables();
             /*
               Install ESC CLI (either the latest or a specific version)
