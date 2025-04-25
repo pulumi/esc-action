@@ -72,6 +72,53 @@ function getExportEnvironmentVariables(): boolean {
     return exportVars === undefined ? true : exportVars;
 }
 
+function getKeys(): [Record<string, string>, boolean] {
+    // If no value is present for keys, default to exporting all vars.
+    const input = getInput('keys', 'KEYS');
+    if (!input) {
+        return [{}, true];
+    }
+
+    // If the value is a boolean true or false, return it with an empty mapping.
+    try {
+        return [{}, parseBooleanValue(input)];
+    } catch { }
+
+    // Otherwise, parse the value as a list of [FOO=]BAR key-value pairs, where FOO is the name of the envvar to set and
+    // BAR is the name of the variable to use as the value. If FOO is omitted, BAR is also used as the name of the
+    // envvar to set. If BAR is '*', then all unmapped variables are implicitly mapped to themselves.
+    //
+    // For example, the value 'GITHUB_TOKEN=PULUMI_BOT_TOKEN,AWS_KEY_ID,AWS_SECRET_KEY,AWS_SESSION_TOKEN' will export
+    // this environment:
+    //
+    //   GITHUB_TOKEN=PULUMI_BOT_TOKEN,
+    //   AWS_KEY_ID=AWS_KEY_ID
+    //   AWS_SECRET_KEY=AWS_SECRET_KEY
+    //   AWS_SESSION_TOKEN=AWS_SESSION_TOKEN
+    //
+    // If the source ESC env also contained other environment variables, they would not be exported. All non-mapped variables
+    // can be exported with the identity mapping by including '*' as a key. For example, 'GITHUB_TOKEN=PULUMI_BOT_TOKEN,*`
+    // would also export the environment above assuming no other envvars exist in the ESC environment.
+
+    let all = false;
+    const mappings: Record<string, string> = {};
+    for (const mapping of input.split(',').map(v => v.trim())) {
+        if (mapping === '*') {
+            all = true;
+            continue;
+        }
+
+        const eq = mapping.indexOf('=');
+        if (eq === -1) {
+            mappings[mapping] = mapping;
+        } else {
+            const [to, from] = [mapping.slice(0, eq), mapping.slice(eq + 1)];
+            mappings[from] = to;
+        }
+    }
+    return [mappings, all];
+}
+
 async function getInstalledVersion(): Promise<string | undefined> {
     const installed = await io.which('esc');
     if (!installed) {
@@ -133,7 +180,7 @@ async function run(): Promise<void> {
         // Parse inputs
         const escVersion: string = getInput('version', 'VERSION') || await fetch('https://www.pulumi.com/esc/latest-version').then(r => r.text()).then(t => t.trim());
         const environment = getInput('environment', 'ENVIRONMENT');
-        const keys = getInput('keys', 'KEYS');
+        const [mapping, allKeys] = getKeys();
         const cloudUrl = getInput('cloud-url', 'CLOUD_URL') || 'https://api.pulumi.com';
         const exportVars = getExportEnvironmentVariables();
 
@@ -198,18 +245,24 @@ ${result.stderr}`)
                 throw new Error(`Failed to open environment: ${parseErr}`);
             }
 
+
+            // Calculate the final set of mappings. If allKeys is true, add identity mappings for all unmapped variables;
+            // otherwise, just use the user's mappings.
+            const finalMapping = allKeys
+                ? Object.assign(Object.fromEntries(Object.keys(dotenv).map(k => [k, k])), mapping)
+                : mapping;
+
             const envVars: Record<string, string> = {};
-            const variables = keys ? keys.split(',').map(v => v.trim()) : Object.keys(dotenv);
-            for (const key of variables) {
-                const value = dotenv[key];
+            for (const [from, to] of Object.entries(finalMapping)) {
+                const value = dotenv[from];
                 if (value) {
                     // Mask the secret so it doesn't appear in logs
                     core.setSecret(value);
 
-                    envVars[key] = value;
-                    core.setOutput(key, value);
+                    envVars[to] = value;
+                    core.setOutput(to, value);
                 } else {
-                    core.warning(`No value found for environmentVariables.${key}`);
+                    core.warning(`No value found for environmentVariables.${from}`);
                 }
             }
 
