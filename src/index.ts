@@ -66,22 +66,20 @@ function getOidcLoginConfig(cloudUrl: string): rt.Result<OidcLoginConfig> {
     });
 }
 
+function getExportEnvironmentVariables(keys: string | undefined): [Record<string, string>, boolean] {
+    const exportAll = !keys;
+    const keysMapping = keys ? Object.fromEntries(keys.split(',').map(k => [k, k])) : {};
 
-function getExportEnvironmentVariables(): boolean {
-    const exportVars = getBooleanInput('export-environment-variables', 'EXPORT_ENVIRONMENT_VARIABLES');
-    return exportVars === undefined ? true : exportVars;
-}
-
-function getKeys(): [Record<string, string>, boolean] {
-    // If no value is present for keys, default to exporting all vars.
-    const input = getInput('keys', 'KEYS');
+    // If no value is present for keys, default to pulling mappings from keys.
+    const input = getInput('export-environment-variables', 'EXPORT_ENVIRONMENT_VARIABLES');
     if (!input) {
-        return [{}, true];
+		return [keysMapping, exportAll]
     }
 
-    // If the value is a boolean true or false, return it with an empty mapping.
+    // If the value is a boolean true or false, return it with the mappings from keys.
     try {
-        return [{}, parseBooleanValue(input)];
+        const exportAny = parseBooleanValue(input);
+        return !exportAny ? [{}, false] : [keysMapping, exportAll];
     } catch { }
 
     // Otherwise, parse the value as a list of [FOO=]BAR key-value pairs, where FOO is the name of the envvar to set and
@@ -180,9 +178,9 @@ async function run(): Promise<void> {
         // Parse inputs
         const escVersion: string = getInput('version', 'VERSION') || await fetch('https://www.pulumi.com/esc/latest-version').then(r => r.text()).then(t => t.trim());
         const environment = getInput('environment', 'ENVIRONMENT');
-        const [mapping, allKeys] = getKeys();
+        const keys = getInput('keys', 'KEYS');
         const cloudUrl = getInput('cloud-url', 'CLOUD_URL') || 'https://api.pulumi.com';
-        const exportVars = getExportEnvironmentVariables();
+        const [mapping, allVars] = getExportEnvironmentVariables(keys);
 
         const useOidcAuth = getBooleanInput('oidc-auth', 'ESC_ACTION_OIDC_AUTH');
         if (useOidcAuth) {
@@ -245,42 +243,39 @@ ${result.stderr}`)
                 throw new Error(`Failed to open environment: ${parseErr}`);
             }
 
+            // Populate step outputs and mark secrets so they do not appear in logs.
+            for (const [key, value] of Object.entries(dotenv)) {
+                core.setSecret(value);
+                core.setOutput(key, value);
+            }
 
-            // Calculate the final set of mappings. If allKeys is true, add identity mappings for all unmapped variables;
+            // Calculate the final set of mappings. If allVars is true, add identity mappings for all unmapped variables;
             // otherwise, just use the user's mappings.
-            const finalMapping = allKeys
+            const finalMapping = allVars
                 ? Object.assign(Object.fromEntries(Object.keys(dotenv).map(k => [k, k])), mapping)
                 : mapping;
 
-            const envVars: Record<string, string> = {};
-            for (const [from, to] of Object.entries(finalMapping)) {
-                const value = dotenv[from];
-                if (value) {
-                    // Mask the secret so it doesn't appear in logs
-                    core.setSecret(value);
-
-                    envVars[to] = value;
-                    core.setOutput(to, value);
-                } else {
-                    core.warning(`No value found for environmentVariables.${from}`);
-                }
-            }
-
-            if (exportVars) {
+            // Export envvars.
+            if (Object.keys(finalMapping).length != 0) {
                 const envFilePath = process.env.GITHUB_ENV;
                 if (!envFilePath) {
                     throw new Error('GITHUB_ENV is not defined. Cannot append environment variables.');
                 }
 
-                for (const [key, value] of Object.entries(envVars)) {
-                    // Append in multiline syntax to handle any newlines safely
-                    // e.g.: MY_ENV_VAR<<EOF
-                    // line1
-                    // line2
-                    // EOF
-                    fs.appendFileSync(envFilePath, `${key}<<EOF\n${value}\nEOF\n`);
+                for (const [from, to] of Object.entries(finalMapping)) {
+                    const value = dotenv[from];
+                    if (value) {
+                        // Append in multiline syntax to handle any newlines safely
+                        // e.g.: MY_ENV_VAR<<EOF
+                        // line1
+                        // line2
+                        // EOF
+                        fs.appendFileSync(envFilePath, `${to}<<EOF\n${value}\nEOF\n`);
+                    } else {
+                        core.warning(`No value found for ${to}=environmentVariables.${from}`);
+                    }
                 }
-                core.info(`Injected ${Object.keys(envVars).length} environment variables`);
+                core.info(`Injected ${Object.keys(finalMapping).length} environment variables`);
             }
 
             core.endGroup();
