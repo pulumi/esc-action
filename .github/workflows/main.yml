@@ -147,7 +147,7 @@ jobs:
     env:
       ESC_ACTION_ENVIRONMENT: pulumi/github/esc-action
       ESC_ACTION_KEYS: FOO,SOME_IMPORTANT_KEY
-      ESC_ACITON_CLOUD_URL: https://api.pulumi-staging.io
+      ESC_ACTION_CLOUD_URL: https://api.pulumi-staging.io
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
