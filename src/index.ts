@@ -5,13 +5,13 @@ import * as tc from '@actions/tool-cache';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { env } from 'process';
 
 function getInput(name: string, envVar: string, required?: boolean): string | undefined {
-    const val = core.getInput(name) || env[`ESC_ACTION_${envVar}`];
+    const val = core.getInput(name) || process.env[`ESC_ACTION_${envVar}`];
     if (!val && required) {
         throw new Error(`Input or environment variable required and not supplied: ${name} (${envVar})`);
     }
+    core.info(`input ${name} or ESC_ACTION_${envVar}: ${val}`);
     return val;
 }
 

@@ -28228,12 +28228,12 @@ const tc = __importStar(__nccwpck_require__(3472));
 const fs = __importStar(__nccwpck_require__(9896));
 const os = __importStar(__nccwpck_require__(857));
 const path = __importStar(__nccwpck_require__(6928));
-const process_1 = __nccwpck_require__(932);
 function getInput(name, envVar, required) {
-    const val = core.getInput(name) || process_1.env[`ESC_ACTION_${envVar}`];
+    const val = core.getInput(name) || process.env[`ESC_ACTION_${envVar}`];
     if (!val && required) {
         throw new Error(`Input or environment variable required and not supplied: ${name} (${envVar})`);
     }
+    core.info(`input ${name} or ESC_ACTION_${envVar}: ${val}`);
     return val;
 }
 function parseBooleanValue(val) {
@@ -28562,14 +28562,6 @@ module.exports = require("path");
 
 "use strict";
 module.exports = require("perf_hooks");
-
-/***/ }),
-
-/***/ 932:
-/***/ ((module) => {
-
-"use strict";
-module.exports = require("process");
 
 /***/ }),
 
