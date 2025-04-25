@@ -5,6 +5,12 @@ import * as tc from '@actions/tool-cache';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import * as rt from 'runtypes';
+import {
+    type OidcLoginConfig,
+    OidcLoginConfigRuntype,
+    ensureAccessToken,
+} from '@pulumi/actions-helpers/auth';
 
 function getInput(name: string, envVar: string, required?: boolean): string | undefined {
     const val = core.getInput(name) || process.env[`ESC_ACTION_${envVar}`];
@@ -36,6 +42,30 @@ function getBooleanInput(name: string, envVar: string, required?: boolean): bool
     }
     return parseBooleanValue(val);
 }
+
+function getNumberInput(name: string, envVar: string, required?: boolean): number | undefined {
+    const val = getInput(name, envVar, required);
+    if (!val) {
+        return undefined;
+    }
+    const parsedVal = Number(val);
+    if (Number.isNaN(parsedVal)) {
+        throw new Error('Input was not a number');
+    }
+    return parsedVal || undefined;
+}
+
+function getOidcLoginConfig(cloudUrl: string): rt.Result<OidcLoginConfig> {
+    return OidcLoginConfigRuntype.validate({
+        organizationName: getInput('oidc-organization', 'OIDC_ORGANIZATION', true)!,
+        requestedTokenType: getInput('oidc-requested-token-type', 'OIDC_REQUESTED_TOKEN_TYPE', true)!,
+        scope: getInput('oidc-scope', 'OIDC_SCOPE') || undefined,
+        expiration: getNumberInput('oidc-token-expiration', 'OIDC_TOKEN_EXPIRATION') || undefined,
+        cloudUrl: cloudUrl || 'https://api.pulumi.com',
+        exportEnvironmentVariables: false,
+    });
+}
+
 
 function getExportEnvironmentVariables(): boolean {
     const exportVars = getBooleanInput('export-environment-variables', 'EXPORT_ENVIRONMENT_VARIABLES');
@@ -106,6 +136,17 @@ async function run(): Promise<void> {
         const keys = getInput('keys', 'KEYS');
         const cloudUrl = getInput('cloud-url', 'CLOUD_URL') || 'https://api.pulumi.com';
         const exportVars = getExportEnvironmentVariables();
+
+        const useOidcAuth = getBooleanInput('oidc-auth', 'ESC_ACTION_OIDC_AUTH');
+        if (useOidcAuth) {
+            const oidcConfig = getOidcLoginConfig(cloudUrl);
+            if (!oidcConfig.success) {
+                throw new Error('Invalid OIDC configuration');
+            }
+            const accessToken = await ensureAccessToken(oidcConfig.value);
+            core.setSecret(accessToken);
+            process.env.PULUMI_ACCESS_TOKEN = accessToken;
+        }
 
         /*
           Install ESC CLI (either the latest or a specific version)
