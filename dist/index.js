@@ -28228,6 +28228,37 @@ const tc = __importStar(__nccwpck_require__(3472));
 const fs = __importStar(__nccwpck_require__(9896));
 const os = __importStar(__nccwpck_require__(857));
 const path = __importStar(__nccwpck_require__(6928));
+function getInput(name, envVar, required) {
+    const val = core.getInput(name) || process.env[`ESC_ACTION_${envVar}`];
+    if (!val && required) {
+        throw new Error(`Input or environment variable required and not supplied: ${name} (${envVar})`);
+    }
+    core.info(`input ${name} or ESC_ACTION_${envVar}: ${val}`);
+    return val;
+}
+function parseBooleanValue(val) {
+    const trueValue = ['true', 'True', 'TRUE'];
+    const falseValue = ['false', 'False', 'FALSE'];
+    if (trueValue.includes(val)) {
+        return true;
+    }
+    if (falseValue.includes(val)) {
+        return false;
+    }
+    throw new TypeError(`Value does not meet YAML 1.2 "Core Schema" specification\n` +
+        `Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
+}
+function getBooleanInput(name, envVar, required) {
+    const val = getInput(name, envVar, required);
+    if (!val) {
+        return undefined;
+    }
+    return parseBooleanValue(val);
+}
+function getExportEnvironmentVariables() {
+    const exportVars = getBooleanInput('export-environment-variables', 'EXPORT_ENVIRONMENT_VARIABLES');
+    return exportVars === undefined ? true : exportVars;
+}
 function getInstalledVersion() {
     return __awaiter(this, void 0, void 0, function* () {
         const installed = yield io.which('esc');
@@ -28239,6 +28270,7 @@ function getInstalledVersion() {
         if (exitCode === 0 && stdout.trim().startsWith('v')) {
             return stdout.trim().substring(1);
         }
+        return undefined;
     });
 }
 function install(version) {
@@ -28252,17 +28284,17 @@ function install(version) {
         if (installedVersion) {
             core.info(`Already-installed ESC CLI is not version ${version}`);
         }
-        const tmp = fs.mkdtempSync("esc-");
+        const tmp = fs.mkdtempSync('esc-');
         const destination = path.join(os.homedir(), '.pulumi', 'bin');
         core.info(`Install destination is ${destination}`);
         yield io.mkdirP(destination);
         core.debug(`Successfully created ${destination}`);
-        const [platform, arch, ext] = core.platform.platform === "win32" ? ["windows", "x64", "zip"] : [core.platform.platform, core.platform.arch, "tar.gz"];
+        const [platform, arch, ext] = core.platform.platform === 'win32' ? ['windows', 'x64', 'zip'] : [core.platform.platform, core.platform.arch, 'tar.gz'];
         const downloadURL = `https://get.pulumi.com/esc/releases/esc-v${version}-${platform}-${arch}.${ext}`;
         core.info(`downloading ${downloadURL}`);
         const downloaded = yield tc.downloadTool(downloadURL);
         core.info(`successfully downloaded ${downloadURL} to ${downloaded}`);
-        const [extract, bin, srcDir] = platform === "windows" ? [tc.extractZip, 'esc.exe', 'bin'] : [tc.extractTar, 'esc', ''];
+        const [extract, bin, srcDir] = platform === 'windows' ? [tc.extractZip, 'esc.exe', 'bin'] : [tc.extractTar, 'esc', ''];
         const extractedPath = yield extract(downloaded, tmp);
         core.info(`Successfully extracted ${downloaded} to ${extractedPath}`);
         const oldPath = path.join(tmp, 'esc', srcDir, bin);
@@ -28279,11 +28311,11 @@ function run() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             // Parse inputs
-            const escVersion = core.getInput('version') || (yield fetch("https://www.pulumi.com/esc/latest-version").then(r => r.text()).then(t => t.trim()));
-            const environment = core.getInput('environment');
-            const keys = core.getInput('keys');
-            const cloudUrl = core.getInput('cloud-url');
-            const exportVars = core.getInput('export-environment-variables') === "" ? true : core.getBooleanInput('export-environment-variables');
+            const escVersion = getInput('version', 'VERSION') || (yield fetch('https://www.pulumi.com/esc/latest-version').then(r => r.text()).then(t => t.trim()));
+            const environment = getInput('environment', 'ENVIRONMENT');
+            const keys = getInput('keys', 'KEYS');
+            const cloudUrl = getInput('cloud-url', 'CLOUD_URL') || 'https://api.pulumi.com';
+            const exportVars = getExportEnvironmentVariables();
             /*
               Install ESC CLI (either the latest or a specific version)
     
@@ -28316,7 +28348,7 @@ ${result.stderr}`);
                     // We need to convert it to an object
                     const lines = result.stdout.split('\n');
                     for (const line of lines) {
-                        const [key, value] = line.split('=');
+                        const [key, value] = line.split('=', 2);
                         if (key && value) {
                             // Remove quotes from the value
                             dotenv[key.trim()] = value.replace(/(^"|"$)/g, '').trim();
