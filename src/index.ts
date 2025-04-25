@@ -31,7 +31,7 @@ function parseBooleanValue(val: string): boolean {
 
 function getBooleanInput(name: string, envVar: string, required?: boolean): boolean | undefined {
     const val = getInput(name, envVar, required);
-    if (val === undefined) {
+    if (!val) {
         return undefined;
     }
     return parseBooleanValue(val);
@@ -102,7 +102,7 @@ async function run(): Promise<void> {
     try {
         // Parse inputs
         const escVersion: string = getInput('version', 'VERSION') || await fetch('https://www.pulumi.com/esc/latest-version').then(r => r.text()).then(t => t.trim());
-        const environment = getInput('environment', 'ENVIRONMENT', true)!;
+        const environment = getInput('environment', 'ENVIRONMENT');
         const keys = getInput('keys', 'KEYS');
         const cloudUrl = getInput('cloud-url', 'CLOUD_URL') || "";
         const exportVars = getExportEnvironmentVariables();

@@ -28250,7 +28250,7 @@ function parseBooleanValue(val) {
 }
 function getBooleanInput(name, envVar, required) {
     const val = getInput(name, envVar, required);
-    if (val === undefined) {
+    if (!val) {
         return undefined;
     }
     return parseBooleanValue(val);
@@ -28312,7 +28312,7 @@ function run() {
         try {
             // Parse inputs
             const escVersion = getInput('version', 'VERSION') || (yield fetch('https://www.pulumi.com/esc/latest-version').then(r => r.text()).then(t => t.trim()));
-            const environment = getInput('environment', 'ENVIRONMENT', true);
+            const environment = getInput('environment', 'ENVIRONMENT');
             const keys = getInput('keys', 'KEYS');
             const cloudUrl = getInput('cloud-url', 'CLOUD_URL') || "";
             const exportVars = getExportEnvironmentVariables();
