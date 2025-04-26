@@ -66,10 +66,55 @@ function getOidcLoginConfig(cloudUrl: string): rt.Result<OidcLoginConfig> {
     });
 }
 
+function getExportEnvironmentVariables(keys: string | undefined): [Record<string, string>, boolean] {
+    const exportAll = !keys;
+    const keysMapping = keys ? Object.fromEntries(keys.split(',').map(k => [k, k])) : {};
 
-function getExportEnvironmentVariables(): boolean {
-    const exportVars = getBooleanInput('export-environment-variables', 'EXPORT_ENVIRONMENT_VARIABLES');
-    return exportVars === undefined ? true : exportVars;
+    // If no value is present for keys, default to pulling mappings from keys.
+    const input = getInput('export-environment-variables', 'EXPORT_ENVIRONMENT_VARIABLES');
+    if (!input) {
+		return [keysMapping, exportAll]
+    }
+
+    // If the value is a boolean true or false, return it with the mappings from keys.
+    try {
+        const exportAny = parseBooleanValue(input);
+        return !exportAny ? [{}, false] : [keysMapping, exportAll];
+    } catch { }
+
+    // Otherwise, parse the value as a list of [FOO=]BAR key-value pairs, where FOO is the name of the envvar to set and
+    // BAR is the name of the variable to use as the value. If FOO is omitted, BAR is also used as the name of the
+    // envvar to set. If BAR is '*', then all unmapped variables are implicitly mapped to themselves.
+    //
+    // For example, the value 'GITHUB_TOKEN=PULUMI_BOT_TOKEN,AWS_KEY_ID,AWS_SECRET_KEY,AWS_SESSION_TOKEN' will export
+    // this environment:
+    //
+    //   GITHUB_TOKEN=PULUMI_BOT_TOKEN,
+    //   AWS_KEY_ID=AWS_KEY_ID
+    //   AWS_SECRET_KEY=AWS_SECRET_KEY
+    //   AWS_SESSION_TOKEN=AWS_SESSION_TOKEN
+    //
+    // If the source ESC env also contained other environment variables, they would not be exported. All non-mapped variables
+    // can be exported with the identity mapping by including '*' as a key. For example, 'GITHUB_TOKEN=PULUMI_BOT_TOKEN,*`
+    // would also export the environment above assuming no other envvars exist in the ESC environment.
+
+    let all = false;
+    const mappings: Record<string, string> = {};
+    for (const mapping of input.split(',').map(v => v.trim())) {
+        if (mapping === '*') {
+            all = true;
+            continue;
+        }
+
+        const eq = mapping.indexOf('=');
+        if (eq === -1) {
+            mappings[mapping] = mapping;
+        } else {
+            const [to, from] = [mapping.slice(0, eq), mapping.slice(eq + 1)];
+            mappings[from] = to;
+        }
+    }
+    return [mappings, all];
 }
 
 async function getInstalledVersion(): Promise<string | undefined> {
@@ -135,7 +180,7 @@ async function run(): Promise<void> {
         const environment = getInput('environment', 'ENVIRONMENT');
         const keys = getInput('keys', 'KEYS');
         const cloudUrl = getInput('cloud-url', 'CLOUD_URL') || 'https://api.pulumi.com';
-        const exportVars = getExportEnvironmentVariables();
+        const [mapping, allVars] = getExportEnvironmentVariables(keys);
 
         const useOidcAuth = getBooleanInput('oidc-auth', 'ESC_ACTION_OIDC_AUTH');
         if (useOidcAuth) {
@@ -198,36 +243,39 @@ ${result.stderr}`)
                 throw new Error(`Failed to open environment: ${parseErr}`);
             }
 
-            const envVars: Record<string, string> = {};
-            const variables = keys ? keys.split(',').map(v => v.trim()) : Object.keys(dotenv);
-            for (const key of variables) {
-                const value = dotenv[key];
-                if (value) {
-                    // Mask the secret so it doesn't appear in logs
-                    core.setSecret(value);
-
-                    envVars[key] = value;
-                    core.setOutput(key, value);
-                } else {
-                    core.warning(`No value found for environmentVariables.${key}`);
-                }
+            // Populate step outputs and mark secrets so they do not appear in logs.
+            for (const [key, value] of Object.entries(dotenv)) {
+                core.setSecret(value);
+                core.setOutput(key, value);
             }
 
-            if (exportVars) {
+            // Calculate the final set of mappings. If allVars is true, add identity mappings for all unmapped variables;
+            // otherwise, just use the user's mappings.
+            const finalMapping = allVars
+                ? Object.assign(Object.fromEntries(Object.keys(dotenv).map(k => [k, k])), mapping)
+                : mapping;
+
+            // Export envvars.
+            if (Object.keys(finalMapping).length != 0) {
                 const envFilePath = process.env.GITHUB_ENV;
                 if (!envFilePath) {
                     throw new Error('GITHUB_ENV is not defined. Cannot append environment variables.');
                 }
 
-                for (const [key, value] of Object.entries(envVars)) {
-                    // Append in multiline syntax to handle any newlines safely
-                    // e.g.: MY_ENV_VAR<<EOF
-                    // line1
-                    // line2
-                    // EOF
-                    fs.appendFileSync(envFilePath, `${key}<<EOF\n${value}\nEOF\n`);
+                for (const [from, to] of Object.entries(finalMapping)) {
+                    const value = dotenv[from];
+                    if (value) {
+                        // Append in multiline syntax to handle any newlines safely
+                        // e.g.: MY_ENV_VAR<<EOF
+                        // line1
+                        // line2
+                        // EOF
+                        fs.appendFileSync(envFilePath, `${to}<<EOF\n${value}\nEOF\n`);
+                    } else {
+                        core.warning(`No value found for ${to}=environmentVariables.${from}`);
+                    }
                 }
-                core.info(`Injected ${Object.keys(envVars).length} environment variables`);
+                core.info(`Injected ${Object.keys(finalMapping).length} environment variables`);
             }
 
             core.endGroup();
