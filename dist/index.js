@@ -52205,7 +52205,7 @@ async function run() {
         const keys = getInput('keys', 'KEYS');
         const cloudUrl = getInput('cloud-url', 'CLOUD_URL') || 'https://api.pulumi.com';
         const [mapping, allVars] = getExportEnvironmentVariables(keys);
-        const useOidcAuth = getBooleanInput('oidc-auth', 'ESC_ACTION_OIDC_AUTH');
+        const useOidcAuth = getBooleanInput('oidc-auth', 'OIDC_AUTH');
         if (useOidcAuth) {
             const oidcConfig = getOidcLoginConfig(cloudUrl);
             if (!oidcConfig.success) {
