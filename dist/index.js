@@ -52176,7 +52176,7 @@ async function install(version) {
         coreExports.info(`Already-installed ESC CLI is not version ${version}`);
     }
     const tmp = require$$1.mkdtempSync('esc-');
-    const destination = require$$1$1.join(require$$0$1.homedir(), '.pulumi', 'bin');
+    const destination = require$$1$1.join(require$$0$1.homedir(), '.pulumi', 'esc', 'bin');
     coreExports.info(`Install destination is ${destination}`);
     await ioExports.mkdirP(destination);
     coreExports.debug(`Successfully created ${destination}`);
