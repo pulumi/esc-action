@@ -73,7 +73,7 @@ function getExportEnvironmentVariables(keys: string | undefined): [Record<string
     // If no value is present for keys, default to pulling mappings from keys.
     const input = getInput('export-environment-variables', 'EXPORT_ENVIRONMENT_VARIABLES');
     if (!input) {
-		return [keysMapping, exportAll]
+        return [keysMapping, exportAll]
     }
 
     // If the value is a boolean true or false, return it with the mappings from keys.
@@ -146,7 +146,7 @@ async function install(version: string): Promise<void> {
 
     const tmp = fs.mkdtempSync('esc-');
 
-    const destination = path.join(os.homedir(), '.pulumi', 'bin');
+    const destination = path.join(os.homedir(), '.pulumi', 'esc', 'bin');
     core.info(`Install destination is ${destination}`);
 
     await io.mkdirP(destination);
