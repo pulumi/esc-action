@@ -111,7 +111,7 @@ function getExportEnvironmentVariables(keys: string | undefined): [Record<string
             mappings[mapping] = mapping;
         } else {
             const [to, from] = [mapping.slice(0, eq), mapping.slice(eq + 1)];
-            mappings[from] = to;
+            mappings[to] = from;
         }
     }
     return [mappings, all];
@@ -251,18 +251,21 @@ ${result.stderr}`)
 
             // Calculate the final set of mappings. If allVars is true, add identity mappings for all unmapped variables;
             // otherwise, just use the user's mappings.
-            const finalMapping = allVars
-                ? Object.assign(Object.fromEntries(Object.keys(dotenv).map(k => [k, k])), mapping)
-                : mapping;
+			if (allVars) {
+				const mapped = new Set(Object.values(mapping));
+				for (const k of Object.keys(dotenv).filter(k => !mapped.has(k))) {
+					mapping[k] = k;
+				}
+			}
 
             // Export envvars.
-            if (Object.keys(finalMapping).length != 0) {
+            if (Object.keys(mapping).length != 0) {
                 const envFilePath = process.env.GITHUB_ENV;
                 if (!envFilePath) {
                     throw new Error('GITHUB_ENV is not defined. Cannot append environment variables.');
                 }
 
-                for (const [from, to] of Object.entries(finalMapping)) {
+                for (const [to, from] of Object.entries(mapping)) {
                     const value = dotenv[from];
                     if (value) {
                         // Append in multiline syntax to handle any newlines safely
@@ -276,7 +279,7 @@ ${result.stderr}`)
                         core.warning(`No value found for ${to}=environmentVariables.${from}`);
                     }
                 }
-                core.info(`Injected ${Object.keys(finalMapping).length} environment variables`);
+                core.info(`Injected ${Object.keys(mapping).length} environment variables`);
             }
 
             core.endGroup();

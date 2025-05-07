@@ -158,12 +158,12 @@ jobs:
         uses: ./
         with:
           environment: 'pulumi/github/esc-action'
-          export-environment-variables: 'BAR=FOO,SOME_IMPORTANT_KEY'
+          export-environment-variables: 'BAR=FOO,BAZ=SOME_IMPORTANT_KEY,SOME_IMPORTANT_KEY'
           cloud-url: https://api.pulumi-staging.io
       - name: Verify injection
         run: |
           echo "Testing env injection..."
-          REQUIRED_VARS=("BAR" "SOME_IMPORTANT_KEY")
+          REQUIRED_VARS=("BAR" "BAZ" "SOME_IMPORTANT_KEY")
           for var in "${REQUIRED_VARS[@]}"; do
             if [[ -z "${!var}" ]]; then
               echo "Error: $var is not set or empty" >&2
