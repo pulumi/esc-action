@@ -89,7 +89,7 @@ function getExportEnvironmentVariables(keys: string | undefined): [Record<string
     // For example, the value 'GITHUB_TOKEN=PULUMI_BOT_TOKEN,AWS_KEY_ID,AWS_SECRET_KEY,AWS_SESSION_TOKEN' will export
     // this environment:
     //
-    //   GITHUB_TOKEN=PULUMI_BOT_TOKEN,
+    //   GITHUB_TOKEN=PULUMI_BOT_TOKEN
     //   AWS_KEY_ID=AWS_KEY_ID
     //   AWS_SECRET_KEY=AWS_SECRET_KEY
     //   AWS_SESSION_TOKEN=AWS_SESSION_TOKEN
@@ -271,6 +271,7 @@ ${result.stderr}`)
                         // line2
                         // EOF
                         fs.appendFileSync(envFilePath, `${to}<<EOF\n${value}\nEOF\n`);
+                        core.info(`Injected ${to}=${from}`);
                     } else {
                         core.warning(`No value found for ${to}=environmentVariables.${from}`);
                     }
