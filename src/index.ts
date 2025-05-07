@@ -111,7 +111,7 @@ function getExportEnvironmentVariables(keys: string | undefined): [Record<string
             mappings[mapping] = mapping;
         } else {
             const [to, from] = [mapping.slice(0, eq), mapping.slice(eq + 1)];
-            mappings[from] = to;
+            mappings[to] = from;
         }
     }
     return [mappings, all];
@@ -262,7 +262,7 @@ ${result.stderr}`)
                     throw new Error('GITHUB_ENV is not defined. Cannot append environment variables.');
                 }
 
-                for (const [from, to] of Object.entries(finalMapping)) {
+                for (const [to, from] of Object.entries(finalMapping)) {
                     const value = dotenv[from];
                     if (value) {
                         // Append in multiline syntax to handle any newlines safely
