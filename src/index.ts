@@ -233,7 +233,12 @@ ${result.stderr}`)
                 // We need to convert it to an object
                 const lines = result.stdout.split('\n');
                 for (const line of lines) {
-                    const [key, value] = line.split('=', 2);
+                    const eq = line.indexOf('=');
+                    if (eq < 0) {
+                        continue;
+                    }
+                    const [key, value] = [line.slice(0, eq), line.slice(eq + 1)];
+
                     if (key && value) {
                         // Remove quotes from the value
                         dotenv[key.trim()] = value.replace(/(^"|"$)/g, '').trim();
