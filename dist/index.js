@@ -52253,8 +52253,8 @@ ${result.stderr}`);
                     }
                     const [key, value] = [line.slice(0, eq), line.slice(eq + 1)];
                     if (key && value) {
-                        // Remove quotes from the value
-                        dotenv[key.trim()] = value.replace(/(^"|"$)/g, '').trim();
+                        // Remove quotes from the beginning and end of the value.
+                        dotenv[key.trim()] = value.replace(/(^"|"$)/g, '');
                     }
                 }
             }
