@@ -52235,7 +52235,7 @@ async function run() {
         if (environment) {
             // Open the environment.
             coreExports.startGroup(`Opening ESC environment: ${environment}`);
-            const result = await execExports.getExecOutput('esc', ['open', environment, '--format', 'dotenv'], { silent: true, ignoreReturnCode: true });
+            const result = await execExports.getExecOutput('esc', ['open', environment, '--format', 'json'], { silent: true, ignoreReturnCode: true });
             if (result.exitCode !== 0) {
                 throw new Error(`\`esc open\` command failed:
 ${result.stderr}`);
@@ -52243,20 +52243,7 @@ ${result.stderr}`);
             // Parse the output
             let dotenv = {};
             try {
-                // The output is in the format KEY="VALUE"
-                // We need to convert it to an object
-                const lines = result.stdout.split('\n');
-                for (const line of lines) {
-                    const eq = line.indexOf('=');
-                    if (eq < 0) {
-                        continue;
-                    }
-                    const [key, value] = [line.slice(0, eq), line.slice(eq + 1)];
-                    if (key && value) {
-                        // Remove quotes from the beginning and end of the value.
-                        dotenv[key.trim()] = value.replace(/(^"|"$)/g, '');
-                    }
-                }
+                dotenv = JSON.parse(result.stdout).environmentVariables;
             }
             catch (parseErr) {
                 throw new Error(`Failed to open environment: ${parseErr}`);
@@ -52288,7 +52275,7 @@ ${result.stderr}`);
                         // line1
                         // line2
                         // EOF
-                        require$$1.appendFileSync(envFilePath, `${to}<<EOF\n${value}\nEOF\n`);
+                        require$$1.appendFileSync(envFilePath, `${to}<<EEEOOOFFF\n${value}\nEEEOOOFFF\n`);
                         coreExports.info(`Injected ${to}=${from}`);
                     }
                     else {
