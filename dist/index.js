@@ -52275,7 +52275,7 @@ ${result.stderr}`);
                         // line1
                         // line2
                         // EOF
-                        require$$1.appendFileSync(envFilePath, `${to}<<PULUMIESCEOL\n${value}PULUMIESCEOL\n`);
+                        require$$1.appendFileSync(envFilePath, `${to}<<PULUMIESCEOL\n${value}\nPULUMIESCEOL\n`);
                         coreExports.info(`Injected ${to}=${from}`);
                     }
                     else {

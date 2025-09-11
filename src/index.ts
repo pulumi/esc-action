@@ -265,7 +265,7 @@ ${result.stderr}`)
                         // line1
                         // line2
                         // EOF
-                        fs.appendFileSync(envFilePath, `${to}<<PULUMIESCEOL\n${value}PULUMIESCEOL\n`);
+                        fs.appendFileSync(envFilePath, `${to}<<PULUMIESCEOL\n${value}\nPULUMIESCEOL\n`);
                         core.info(`Injected ${to}=${from}`);
                     } else {
                         core.warning(`No value found for ${to}=environmentVariables.${from}`);
