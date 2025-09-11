@@ -213,11 +213,12 @@ async function run(): Promise<void> {
         //
         // Check if an environment was provided. If not, skip injection.
         if (environment) {
-            // Open the environment.
+            // Open the environment. The dotenv format is used because it includes
+            // environment variables as well as files.
             core.startGroup(`Opening ESC environment: ${environment}`);
             const result = await exec.getExecOutput(
                 'esc',
-                ['open', environment, '--format', 'json'],
+                ['open', environment, '--format', 'dotenv'],
                 { silent: true, ignoreReturnCode: true }
             );
 
@@ -226,11 +227,24 @@ async function run(): Promise<void> {
 ${result.stderr}`)
             }
 
-
             // Parse the output
             let dotenv: Record<string, string> = {};
             try {
-                dotenv = JSON.parse(result.stdout).environmentVariables
+                // The output is in the format KEY="VALUE"
+                // We need to convert it to an object
+                const lines = result.stdout.split('\n');
+                for (const line of lines) {
+                    const eq = line.indexOf('=');
+                    if (eq < 0) {
+                        continue;
+                    }
+                    const [key, value] = [line.slice(0, eq), line.slice(eq + 1)];
+
+                    if (key && value) {
+                        // Remove quotes from the value
+                        dotenv[key.trim()] = value.replace(/(^"|"$)/g, '');
+                    }
+                }
             } catch (parseErr) {
                 throw new Error(`Failed to open environment: ${parseErr}`);
             }
@@ -265,7 +279,7 @@ ${result.stderr}`)
                         // line1
                         // line2
                         // EOF
-                        fs.appendFileSync(envFilePath, `${to}<<PULUMIESCEOL\n${value}\nPULUMIESCEOL\n`);
+                        fs.appendFileSync(envFilePath, `${to}<<PULUMIESCEOF\n${value}\nPULUMIESCEOF\n`);
                         core.info(`Injected ${to}=${from}`);
                     } else {
                         core.warning(`No value found for ${to}=environmentVariables.${from}`);

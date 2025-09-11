@@ -52233,9 +52233,10 @@ async function run() {
         //
         // Check if an environment was provided. If not, skip injection.
         if (environment) {
-            // Open the environment.
+            // Open the environment. The dotenv format is used because it includes
+            // environment variables as well as files.
             coreExports.startGroup(`Opening ESC environment: ${environment}`);
-            const result = await execExports.getExecOutput('esc', ['open', environment, '--format', 'json'], { silent: true, ignoreReturnCode: true });
+            const result = await execExports.getExecOutput('esc', ['open', environment, '--format', 'dotenv'], { silent: true, ignoreReturnCode: true });
             if (result.exitCode !== 0) {
                 throw new Error(`\`esc open\` command failed:
 ${result.stderr}`);
@@ -52243,7 +52244,20 @@ ${result.stderr}`);
             // Parse the output
             let dotenv = {};
             try {
-                dotenv = JSON.parse(result.stdout).environmentVariables;
+                // The output is in the format KEY="VALUE"
+                // We need to convert it to an object
+                const lines = result.stdout.split('\n');
+                for (const line of lines) {
+                    const eq = line.indexOf('=');
+                    if (eq < 0) {
+                        continue;
+                    }
+                    const [key, value] = [line.slice(0, eq), line.slice(eq + 1)];
+                    if (key && value) {
+                        // Remove quotes from the value
+                        dotenv[key.trim()] = value.replace(/(^"|"$)/g, '');
+                    }
+                }
             }
             catch (parseErr) {
                 throw new Error(`Failed to open environment: ${parseErr}`);
@@ -52275,7 +52289,7 @@ ${result.stderr}`);
                         // line1
                         // line2
                         // EOF
-                        require$$1.appendFileSync(envFilePath, `${to}<<PULUMIESCEOL\n${value}\nPULUMIESCEOL\n`);
+                        require$$1.appendFileSync(envFilePath, `${to}<<PULUMIESCEOF\n${value}\nPULUMIESCEOF\n`);
                         coreExports.info(`Injected ${to}=${from}`);
                     }
                     else {
