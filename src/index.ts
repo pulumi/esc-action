@@ -217,7 +217,7 @@ async function run(): Promise<void> {
             core.startGroup(`Opening ESC environment: ${environment}`);
             const result = await exec.getExecOutput(
                 'esc',
-                ['open', environment, '--format', 'dotenv'],
+                ['open', environment, '--format', 'json'],
                 { silent: true, ignoreReturnCode: true }
             );
 
@@ -226,24 +226,11 @@ async function run(): Promise<void> {
 ${result.stderr}`)
             }
 
+
             // Parse the output
             let dotenv: Record<string, string> = {};
             try {
-                // The output is in the format KEY="VALUE"
-                // We need to convert it to an object
-                const lines = result.stdout.split('\n');
-                for (const line of lines) {
-                    const eq = line.indexOf('=');
-                    if (eq < 0) {
-                        continue;
-                    }
-                    const [key, value] = [line.slice(0, eq), line.slice(eq + 1)];
-
-                    if (key && value) {
-                        // Remove quotes from the beginning and end of the value.
-                        dotenv[key.trim()] = value.replace(/(^"|"$)/g, '');
-                    }
-                }
+                dotenv = JSON.parse(result.stdout).environmentVariables
             } catch (parseErr) {
                 throw new Error(`Failed to open environment: ${parseErr}`);
             }
@@ -278,7 +265,7 @@ ${result.stderr}`)
                         // line1
                         // line2
                         // EOF
-                        fs.appendFileSync(envFilePath, `${to}<<EOF\n${value}\nEOF\n`);
+                        fs.appendFileSync(envFilePath, `${to}<<PULUMIESCEOL\n${value}\nPULUMIESCEOL\n`);
                         core.info(`Injected ${to}=${from}`);
                     } else {
                         core.warning(`No value found for ${to}=environmentVariables.${from}`);
