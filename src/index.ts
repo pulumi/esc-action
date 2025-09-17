@@ -278,7 +278,11 @@ ${result.stderr}`)
                         // line1
                         // line2
                         // EOF
-                        fs.appendFileSync(envFilePath, `${to}<<EOF\n${value}\nEOF\n`);
+                        if (value.includes('\n') || value.includes('"')) {
+                            fs.appendFileSync(envFilePath, `${to}<<EOF\n${value}\nEOF\n`);
+                        } else {
+                            fs.appendFileSync(envFilePath, `${to}="${value}"\n`);
+                        }
                         core.info(`Injected ${to}=${from}`);
                     } else {
                         core.warning(`No value found for ${to}=environmentVariables.${from}`);
