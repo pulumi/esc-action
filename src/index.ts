@@ -213,7 +213,8 @@ async function run(): Promise<void> {
         //
         // Check if an environment was provided. If not, skip injection.
         if (environment) {
-            // Open the environment.
+            // Open the environment. The dotenv format is used because it includes
+            // environment variables as well as files.
             core.startGroup(`Opening ESC environment: ${environment}`);
             const result = await exec.getExecOutput(
                 'esc',
@@ -241,7 +242,7 @@ ${result.stderr}`)
 
                     if (key && value) {
                         // Remove quotes from the value
-                        dotenv[key.trim()] = value.replace(/(^"|"$)/g, '').trim();
+                        dotenv[key.trim()] = value.replace(/(^"|"$)/g, '');
                     }
                 }
             } catch (parseErr) {
@@ -278,7 +279,7 @@ ${result.stderr}`)
                         // line1
                         // line2
                         // EOF
-                        fs.appendFileSync(envFilePath, `${to}<<EOF\n${value}\nEOF\n`);
+                        fs.appendFileSync(envFilePath, `${to}<<PULUMIESCEOF\n${value}\nPULUMIESCEOF\n`);
                         core.info(`Injected ${to}=${from}`);
                     } else {
                         core.warning(`No value found for ${to}=environmentVariables.${from}`);

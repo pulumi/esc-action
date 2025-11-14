@@ -52233,7 +52233,8 @@ async function run() {
         //
         // Check if an environment was provided. If not, skip injection.
         if (environment) {
-            // Open the environment.
+            // Open the environment. The dotenv format is used because it includes
+            // environment variables as well as files.
             coreExports.startGroup(`Opening ESC environment: ${environment}`);
             const result = await execExports.getExecOutput('esc', ['open', environment, '--format', 'dotenv'], { silent: true, ignoreReturnCode: true });
             if (result.exitCode !== 0) {
@@ -52254,7 +52255,7 @@ ${result.stderr}`);
                     const [key, value] = [line.slice(0, eq), line.slice(eq + 1)];
                     if (key && value) {
                         // Remove quotes from the value
-                        dotenv[key.trim()] = value.replace(/(^"|"$)/g, '').trim();
+                        dotenv[key.trim()] = value.replace(/(^"|"$)/g, '');
                     }
                 }
             }
@@ -52288,7 +52289,7 @@ ${result.stderr}`);
                         // line1
                         // line2
                         // EOF
-                        require$$1.appendFileSync(envFilePath, `${to}<<EOF\n${value}\nEOF\n`);
+                        require$$1.appendFileSync(envFilePath, `${to}<<PULUMIESCEOF\n${value}\nPULUMIESCEOF\n`);
                         coreExports.info(`Injected ${to}=${from}`);
                     }
                     else {
