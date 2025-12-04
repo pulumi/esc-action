@@ -58,11 +58,11 @@ For case (3), each _export mapping_ takes one of the following three forms:
 
 **Optional** The type of Pulumi Access Token to obtain. Reqiured if `oidc-auth` is true.
 
-### `oidc-scope` (`ESC_OIDC_SCOPE`)
+### `oidc-scope` (`ESC_ACTION_OIDC_SCOPE`)
 
 **Optional** The requested scopes for the Pulumi Access Token.
 
-### `oidc-expiration` (`ESC_OIDC_EXPIRATION`)
+### `oidc-expiration` (`ESC_ACTION_OIDC_TOKEN_EXPIRATION`)
 
 **Optional** The time-to-live for the Pulumi Access Token.
 

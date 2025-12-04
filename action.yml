@@ -40,7 +40,7 @@ inputs:
     description: 'The requested scopes for the Pulumi Access Token.'
     required: false
     default: ''
-  oidc-expiration:
+  oidc-token-expiration:
     description: 'The time-to-live for the Pulumi Access Token.'
     required: false
     default: ''
