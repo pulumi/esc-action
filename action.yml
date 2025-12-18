@@ -24,6 +24,26 @@ inputs:
   export-environment-variables:
     description: "Whether or not to export environment variables. All environment variables will always be available in the 'env' step output."
     required: false
+  oidc-auth:
+    description: 'When true, the ESC action will exchange the GitHub workflow OIDC token for a Pulumi Access Token. Requires id-token: write permission.'
+    required: false
+    default: 'false'
+  oidc-organization:
+    description: 'The name of the Pulumi organization to use for OIDC token exchange. Required if oidc-auth is true.'
+    required: false
+    default: ''
+  oidc-requested-token-type:
+    description: 'The type of Pulumi Access Token to obtain. Required if oidc-auth is true.'
+    required: false
+    default: ''
+  oidc-scope:
+    description: 'The requested scopes for the Pulumi Access Token.'
+    required: false
+    default: ''
+  oidc-token-expiration:
+    description: 'The time-to-live for the Pulumi Access Token.'
+    required: false
+    default: ''
 runs:
   using: 'node20'
   main: 'dist/index.js'
