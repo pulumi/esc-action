@@ -11,6 +11,12 @@ import {
     OidcLoginConfigRuntype,
     ensureAccessToken,
 } from '@pulumi/actions-helpers/auth';
+import * as axiosRetryModule from 'axios-retry';
+import axios from 'axios';
+
+// axios-retry v4 exports as CJS, need to access default export
+const axiosRetry = (axiosRetryModule as any).default || axiosRetryModule;
+const { exponentialDelay, isNetworkOrIdempotentRequestError } = axiosRetryModule;
 
 function getInput(name: string, envVar: string, required?: boolean): string | undefined {
     const val = core.getInput(name) || process.env[`ESC_ACTION_${envVar}`];
@@ -175,6 +181,21 @@ async function install(version: string): Promise<void> {
 
 async function run(): Promise<void> {
     try {
+        // Configure axios with automatic retry for network errors
+        axiosRetry(axios, {
+            retries: 5,
+            retryDelay: exponentialDelay,
+            retryCondition: (error: any) => {
+                // Retry on network errors (no response) and idempotent request errors
+                return isNetworkOrIdempotentRequestError(error);
+            },
+            onRetry: (retryCount: number, error: any, requestConfig: any) => {
+                core.info(
+                    `Retrying ${requestConfig.url} (attempt ${retryCount}/5): ${error.message}`
+                );
+            },
+        });
+
         // Parse inputs
         const escVersion: string = getInput('version', 'VERSION') || await fetch('https://www.pulumi.com/esc/latest-version').then(r => r.text()).then(t => t.trim());
         const environment = getInput('environment', 'ENVIRONMENT');
