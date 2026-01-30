@@ -166,7 +166,7 @@ jobs:
         id: esc-secrets
         uses: pulumi/esc-action@v1
       - name: `pulumi up`
-        run: pululmi up
+        run: pulumi up
         env:
           PULUMI_ACCESS_TOKEN: ${{ steps.esc-secrets.outputs.ORG_TOKEN }}
   job-2:
