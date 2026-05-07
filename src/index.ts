@@ -234,14 +234,15 @@ async function run(): Promise<void> {
         //
         // Check if an environment was provided. If not, skip injection.
         if (environment) {
-            // Open the environment. JSON format is used so that string values
-            // are returned with their original whitespace (including newlines)
-            // intact rather than as backslash escape sequences. Multi-line
-            // values like PEM-encoded keys must round-trip byte-for-byte.
+            // Open the environment. The dotenv format is used because it
+            // includes environment variables as well as file references --
+            // each entry in the environment's `files` is materialized to a
+            // temporary file by the CLI and exposed here as an env var
+            // pointing at the file's path.
             core.startGroup(`Opening ESC environment: ${environment}`);
             const result = await exec.getExecOutput(
                 'esc',
-                ['open', environment, '--format', 'json'],
+                ['open', environment, '--format', 'dotenv'],
                 { silent: true, ignoreReturnCode: true }
             );
 
@@ -250,14 +251,38 @@ async function run(): Promise<void> {
 ${result.stderr}`)
             }
 
-            // Parse the output and pull out string-valued environment variables.
-            // Non-string values (numbers, booleans, objects, arrays) are skipped
-            // because step outputs and the GITHUB_ENV file format are string-only.
+            // Parse the output. Each non-empty line is `KEY="VALUE"` where
+            // VALUE is the Go strconv.Quote encoding of the original string
+            // (escapes for `\n`, `\r`, `\t`, `\\`, `\"`, and `\uXXXX` for
+            // Unicode). JSON.parse handles all of those correctly, so a
+            // multi-line value such as a PEM-encoded key round-trips with
+            // its newlines intact rather than arriving as literal '\n'
+            // pairs.
             let dotenv: Record<string, string> = {};
             try {
-                const parsed = JSON.parse(result.stdout);
-                const envVars = parsed?.environmentVariables ?? {};
-                for (const [key, value] of Object.entries(envVars)) {
+                const lines = result.stdout.split('\n');
+                for (const line of lines) {
+                    const eq = line.indexOf('=');
+                    if (eq < 0) {
+                        continue;
+                    }
+                    const key = line.slice(0, eq).trim();
+                    const quoted = line.slice(eq + 1);
+
+                    if (!key || !quoted) {
+                        continue;
+                    }
+                    let value: unknown;
+                    try {
+                        value = JSON.parse(quoted);
+                    } catch {
+                        // Fall back to the previous bare strip-quotes
+                        // behavior if the line isn't a valid JSON string.
+                        // Unlikely in practice, but keeps us robust to any
+                        // future strconv.Quote escape that JSON.parse can't
+                        // decode (e.g. \a, \v, \xNN).
+                        value = quoted.replace(/(^"|"$)/g, '');
+                    }
                     if (typeof value === 'string') {
                         dotenv[key] = value;
                     }
