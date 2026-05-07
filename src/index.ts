@@ -13,6 +13,7 @@ import {
 } from '@pulumi/actions-helpers/auth';
 import * as axiosRetryModule from 'axios-retry';
 import axios from 'axios';
+import { parseDotenv } from './parse-dotenv.js';
 
 // axios-retry v4 exports as CJS, need to access default export
 const axiosRetry = (axiosRetryModule as any).default || axiosRetryModule;
@@ -251,42 +252,9 @@ async function run(): Promise<void> {
 ${result.stderr}`)
             }
 
-            // Parse the output. Each non-empty line is `KEY="VALUE"` where
-            // VALUE is the Go strconv.Quote encoding of the original string
-            // (escapes for `\n`, `\r`, `\t`, `\\`, `\"`, and `\uXXXX` for
-            // Unicode). JSON.parse handles all of those correctly, so a
-            // multi-line value such as a PEM-encoded key round-trips with
-            // its newlines intact rather than arriving as literal '\n'
-            // pairs.
-            let dotenv: Record<string, string> = {};
+            let dotenv: Record<string, string>;
             try {
-                const lines = result.stdout.split('\n');
-                for (const line of lines) {
-                    const eq = line.indexOf('=');
-                    if (eq < 0) {
-                        continue;
-                    }
-                    const key = line.slice(0, eq).trim();
-                    const quoted = line.slice(eq + 1);
-
-                    if (!key || !quoted) {
-                        continue;
-                    }
-                    let value: unknown;
-                    try {
-                        value = JSON.parse(quoted);
-                    } catch {
-                        // Fall back to the previous bare strip-quotes
-                        // behavior if the line isn't a valid JSON string.
-                        // Unlikely in practice, but keeps us robust to any
-                        // future strconv.Quote escape that JSON.parse can't
-                        // decode (e.g. \a, \v, \xNN).
-                        value = quoted.replace(/(^"|"$)/g, '');
-                    }
-                    if (typeof value === 'string') {
-                        dotenv[key] = value;
-                    }
-                }
+                dotenv = parseDotenv(result.stdout);
             } catch (parseErr) {
                 throw new Error(`Failed to open environment: ${parseErr}`);
             }
