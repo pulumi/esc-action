@@ -234,12 +234,14 @@ async function run(): Promise<void> {
         //
         // Check if an environment was provided. If not, skip injection.
         if (environment) {
-            // Open the environment. The dotenv format is used because it includes
-            // environment variables as well as files.
+            // Open the environment. JSON format is used so that string values
+            // are returned with their original whitespace (including newlines)
+            // intact rather than as backslash escape sequences. Multi-line
+            // values like PEM-encoded keys must round-trip byte-for-byte.
             core.startGroup(`Opening ESC environment: ${environment}`);
             const result = await exec.getExecOutput(
                 'esc',
-                ['open', environment, '--format', 'dotenv'],
+                ['open', environment, '--format', 'json'],
                 { silent: true, ignoreReturnCode: true }
             );
 
@@ -248,22 +250,16 @@ async function run(): Promise<void> {
 ${result.stderr}`)
             }
 
-            // Parse the output
+            // Parse the output and pull out string-valued environment variables.
+            // Non-string values (numbers, booleans, objects, arrays) are skipped
+            // because step outputs and the GITHUB_ENV file format are string-only.
             let dotenv: Record<string, string> = {};
             try {
-                // The output is in the format KEY="VALUE"
-                // We need to convert it to an object
-                const lines = result.stdout.split('\n');
-                for (const line of lines) {
-                    const eq = line.indexOf('=');
-                    if (eq < 0) {
-                        continue;
-                    }
-                    const [key, value] = [line.slice(0, eq), line.slice(eq + 1)];
-
-                    if (key && value) {
-                        // Remove quotes from the value
-                        dotenv[key.trim()] = value.replace(/(^"|"$)/g, '');
+                const parsed = JSON.parse(result.stdout);
+                const envVars = parsed?.environmentVariables ?? {};
+                for (const [key, value] of Object.entries(envVars)) {
+                    if (typeof value === 'string') {
+                        dotenv[key] = value;
                     }
                 }
             } catch (parseErr) {
