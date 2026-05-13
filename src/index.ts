@@ -13,6 +13,7 @@ import {
 } from '@pulumi/actions-helpers/auth';
 import * as axiosRetryModule from 'axios-retry';
 import axios from 'axios';
+import { parseDotenv } from './parse-dotenv.js';
 
 // axios-retry v4 exports as CJS, need to access default export
 const axiosRetry = (axiosRetryModule as any).default || axiosRetryModule;
@@ -234,8 +235,11 @@ async function run(): Promise<void> {
         //
         // Check if an environment was provided. If not, skip injection.
         if (environment) {
-            // Open the environment. The dotenv format is used because it includes
-            // environment variables as well as files.
+            // Open the environment. The dotenv format is used because it
+            // includes environment variables as well as file references --
+            // each entry in the environment's `files` is materialized to a
+            // temporary file by the CLI and exposed here as an env var
+            // pointing at the file's path.
             core.startGroup(`Opening ESC environment: ${environment}`);
             const result = await exec.getExecOutput(
                 'esc',
@@ -248,27 +252,7 @@ async function run(): Promise<void> {
 ${result.stderr}`)
             }
 
-            // Parse the output
-            let dotenv: Record<string, string> = {};
-            try {
-                // The output is in the format KEY="VALUE"
-                // We need to convert it to an object
-                const lines = result.stdout.split('\n');
-                for (const line of lines) {
-                    const eq = line.indexOf('=');
-                    if (eq < 0) {
-                        continue;
-                    }
-                    const [key, value] = [line.slice(0, eq), line.slice(eq + 1)];
-
-                    if (key && value) {
-                        // Remove quotes from the value
-                        dotenv[key.trim()] = value.replace(/(^"|"$)/g, '');
-                    }
-                }
-            } catch (parseErr) {
-                throw new Error(`Failed to open environment: ${parseErr}`);
-            }
+            const dotenv = parseDotenv(result.stdout);
 
             // Populate step outputs and mark secrets so they do not appear in logs.
             for (const [key, value] of Object.entries(dotenv)) {

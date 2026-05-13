@@ -5,7 +5,8 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "build": "npx rollup --config rollup.config.ts --configPlugin @rollup/plugin-typescript"
+    "build": "npx rollup --config rollup.config.ts --configPlugin @rollup/plugin-typescript",
+    "test": "node --import tsx --test 'src/**/*.test.ts'"
   },
   "keywords": [],
   "author": "",
@@ -28,6 +29,7 @@
     "@types/node": "^22.13.5",
     "prettier": "^3.3.3",
     "rollup": "^4.40.0",
+    "tsx": "^4.21.0",
     "typescript": "^5.8.3"
   }
 }

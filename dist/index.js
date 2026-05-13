@@ -52324,6 +52324,50 @@ var axiosRetryModule = /*#__PURE__*/Object.freeze({
 	retryAfter: retryAfter
 });
 
+// Parse the output of `esc open --format dotenv`.
+//
+// The CLI emits one entry per line as `KEY="VALUE"`, where VALUE is the
+// Go strconv.Quote encoding of the original string. That encoding uses
+// backslash-escape sequences (`\n`, `\r`, `\t`, `\\`, `\"`, and
+// `\uXXXX` for Unicode) and is a strict subset of JSON string syntax
+// for printable strings. JSON.parse handles those escapes correctly,
+// so a multi-line value such as a PEM-encoded key round-trips with its
+// newlines intact rather than arriving as literal `\n` pairs.
+//
+// Lines that do not contain `=`, or that have an empty key or value,
+// are skipped (this also covers blank lines and `# comment` lines).
+//
+// If a line's value isn't a valid JSON string -- e.g. a future
+// strconv.Quote escape that JSON.parse can't represent (`\a`, `\v`,
+// `\xNN`) -- we fall back to bare strip-quote behavior so the parser
+// stays robust.
+function parseDotenv(stdout) {
+    const dotenv = {};
+    const lines = stdout.split('\n');
+    for (const line of lines) {
+        const eq = line.indexOf('=');
+        if (eq < 0) {
+            continue;
+        }
+        const key = line.slice(0, eq).trim();
+        const quoted = line.slice(eq + 1);
+        if (!key || !quoted) {
+            continue;
+        }
+        let value;
+        try {
+            value = JSON.parse(quoted);
+        }
+        catch {
+            value = quoted.replace(/(^"|"$)/g, '');
+        }
+        if (typeof value === 'string') {
+            dotenv[key] = value;
+        }
+    }
+    return dotenv;
+}
+
 // axios-retry v4 exports as CJS, need to access default export
 const axiosRetry = axiosRetry$1 || axiosRetryModule;
 const { exponentialDelay, isNetworkOrIdempotentRequestError } = axiosRetryModule;
@@ -52514,35 +52558,18 @@ async function run() {
         //
         // Check if an environment was provided. If not, skip injection.
         if (environment) {
-            // Open the environment. The dotenv format is used because it includes
-            // environment variables as well as files.
+            // Open the environment. The dotenv format is used because it
+            // includes environment variables as well as file references --
+            // each entry in the environment's `files` is materialized to a
+            // temporary file by the CLI and exposed here as an env var
+            // pointing at the file's path.
             coreExports.startGroup(`Opening ESC environment: ${environment}`);
             const result = await execExports.getExecOutput('esc', ['open', environment, '--format', 'dotenv'], { silent: true, ignoreReturnCode: true });
             if (result.exitCode !== 0) {
                 throw new Error(`\`esc open\` command failed:
 ${result.stderr}`);
             }
-            // Parse the output
-            let dotenv = {};
-            try {
-                // The output is in the format KEY="VALUE"
-                // We need to convert it to an object
-                const lines = result.stdout.split('\n');
-                for (const line of lines) {
-                    const eq = line.indexOf('=');
-                    if (eq < 0) {
-                        continue;
-                    }
-                    const [key, value] = [line.slice(0, eq), line.slice(eq + 1)];
-                    if (key && value) {
-                        // Remove quotes from the value
-                        dotenv[key.trim()] = value.replace(/(^"|"$)/g, '');
-                    }
-                }
-            }
-            catch (parseErr) {
-                throw new Error(`Failed to open environment: ${parseErr}`);
-            }
+            const dotenv = parseDotenv(result.stdout);
             // Populate step outputs and mark secrets so they do not appear in logs.
             for (const [key, value] of Object.entries(dotenv)) {
                 coreExports.setSecret(value);
