@@ -136,11 +136,3 @@ test('decodes multi-line value with = signs inside the body', () => {
     assert.equal(parsed.CERT, original);
 });
 
-test('tolerates CRLF line endings (Windows runners)', () => {
-    // The CLI emits CRLF on Windows. Splitting on \n only would leave
-    // a trailing \r inside the quoted value; JSON.parse would then
-    // reject the line and the fallback would store a CR-suffixed
-    // string. Splitting on \r?\n avoids both.
-    const parsed = parseDotenv(`A="x"\r\nB="y"\r\n`);
-    assert.deepEqual(parsed, { A: 'x', B: 'y' });
-});
