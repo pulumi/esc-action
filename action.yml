@@ -27,7 +27,7 @@ inputs:
   oidc-auth:
     description: 'When true, the ESC action will exchange the GitHub workflow OIDC token for a Pulumi Access Token. Requires id-token: write permission.'
     required: false
-    default: 'false'
+    default: ''
   oidc-organization:
     description: 'The name of the Pulumi organization to use for OIDC token exchange. Required if oidc-auth is true.'
     required: false
