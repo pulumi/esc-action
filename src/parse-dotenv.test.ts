@@ -121,3 +121,26 @@ test('treats whitespace-only key as missing', () => {
     const parsed = parseDotenv(`   ="x"\nA="y"\n`);
     assert.deepEqual(parsed, { A: 'y' });
 });
+
+test('decodes \\uXXXX escapes for non-ASCII characters', () => {
+    // strconv.Quote reaches for \uXXXX on non-ASCII code points.
+    const parsed = parseDotenv(`GREETING="caf\\u00e9"\n`);
+    assert.equal(parsed.GREETING, 'café');
+});
+
+test('decodes multi-line value with = signs inside the body', () => {
+    // Base64-padded multi-line values exercise both the multi-line
+    // round-trip and the indexOf('=') key/value split.
+    const original = 'line1eqs=\nline2eqs==\n';
+    const parsed = parseDotenv(`CERT=${goQuote(original)}\n`);
+    assert.equal(parsed.CERT, original);
+});
+
+test('tolerates CRLF line endings (Windows runners)', () => {
+    // The CLI emits CRLF on Windows. Splitting on \n only would leave
+    // a trailing \r inside the quoted value; JSON.parse would then
+    // reject the line and the fallback would store a CR-suffixed
+    // string. Splitting on \r?\n avoids both.
+    const parsed = parseDotenv(`A="x"\r\nB="y"\r\n`);
+    assert.deepEqual(parsed, { A: 'x', B: 'y' });
+});

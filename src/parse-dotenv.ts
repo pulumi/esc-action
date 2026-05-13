@@ -17,7 +17,10 @@
 // stays robust.
 export function parseDotenv(stdout: string): Record<string, string> {
     const dotenv: Record<string, string> = {};
-    const lines = stdout.split('\n');
+    // Split on LF or CRLF: on Windows runners the CLI emits CRLF, and a
+    // trailing \r inside the quoted value makes JSON.parse reject the
+    // line and the fallback store a CR-suffixed value.
+    const lines = stdout.split(/\r?\n/);
     for (const line of lines) {
         const eq = line.indexOf('=');
         if (eq < 0) {
