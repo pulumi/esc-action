@@ -252,12 +252,7 @@ async function run(): Promise<void> {
 ${result.stderr}`)
             }
 
-            let dotenv: Record<string, string>;
-            try {
-                dotenv = parseDotenv(result.stdout);
-            } catch (parseErr) {
-                throw new Error(`Failed to open environment: ${parseErr}`);
-            }
+            const dotenv = parseDotenv(result.stdout);
 
             // Populate step outputs and mark secrets so they do not appear in logs.
             for (const [key, value] of Object.entries(dotenv)) {
