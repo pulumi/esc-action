@@ -24,6 +24,10 @@ inputs:
   export-environment-variables:
     description: "Whether or not to export environment variables. All environment variables will always be available in the 'env' step output."
     required: false
+  mask:
+    description: "Which injected values to register as masked secrets in logs. 'all' (default) masks every value. 'secrets' masks only values that come from encrypted/secret ESC sources, leaving plaintext config readable."
+    required: false
+    default: ''
   oidc-auth:
     description: 'When true, the ESC action will exchange the GitHub workflow OIDC token for a Pulumi Access Token. Requires id-token: write permission.'
     required: false

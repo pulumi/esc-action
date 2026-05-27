@@ -46,6 +46,17 @@ For case (3), each _export mapping_ takes one of the following three forms:
 2. `SECRET`, which maps the ESC secret named `SECRET` to the environment variable `SECRET` (equivalent to `SECRET=SECRET`)
 3. `*`, which adds identity mappings for any unmapped secrets
 
+### `mask` (`ESC_ACTION_MASK`)
+
+**Optional** Which injected values to register as masked secrets in the workflow
+logs. Defaults to `all`.
+
+1. `all` (default) — every injected value is masked, preserving today's behavior.
+2. `secrets` — only values that come from encrypted/secret ESC sources are masked;
+   plaintext config values stay readable.
+
+See [Masking behavior](#masking-behavior) for details and the tradeoffs.
+
 ### `oidc-auth` (`ESC_ACTION_OIDC_AUTH`)
 
 **Optional** When this input is `true`, the ESC action will exchange the GitHub workflow's OIDC token for a Pulumi Access Token. This token is not available to other steps. Requires `id-token: write` permission.
@@ -71,6 +82,38 @@ For case (3), each _export mapping_ takes one of the following three forms:
 ### `keys` (`ESC_ACTION_KEYS`)
 
 **Optional** (_Deprecated in favor of export-environment-variables_) A comma-separated list of keys to inject into the current action/workflow environment. If not specified, all keys from the environment will be injected.
+
+## Masking behavior
+
+By default (`mask: all`), every value injected from the ESC environment is
+registered as a masked secret (via `::add-mask::`). The GitHub Actions runner then
+masks **every substring occurrence** of each registered value across the run logs
+**and** `$GITHUB_STEP_SUMMARY`.
+
+That is the right default for secrets, but ESC environments often also export
+**plaintext config** alongside secrets. Masking those config values makes logs
+unreadable, and — because masking is substring-based — it can redact unrelated
+text. For example, if a config value happens to be `9215`, a PR number `9215`
+elsewhere in your logs or job summary is rendered as `92***5`; short numeric
+config can turn `8,561,234` into `8,56***` or `$1.3559` into `$***.3559`.
+
+Set `mask: secrets` to mask **only** values that come from encrypted/secret ESC
+sources. Plaintext config is then exported and shown in the clear, so the
+collateral redaction above goes away. Secret detection uses
+`esc open --format detailed`, which annotates each value with whether it resolved
+from a secret source (the `dotenv` output used for injection carries no such
+signal).
+
+Notes and tradeoffs:
+
+- The default is `all`, so existing workflows are unaffected.
+- `mask: secrets` opens the environment a **second time** (with
+  `--format detailed`) to read the secret markers. If your environment mints
+  dynamic/short-lived credentials, this resolves it twice.
+- `mask: secrets` scopes masking to genuine secrets, which removes the common
+  case of plaintext config redacting your logs. A genuine secret whose value is
+  itself very short or low-entropy can still match unrelated substrings — masking
+  remains correct for it, it is simply still masked.
 
 ## Example usage
 
