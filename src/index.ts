@@ -176,6 +176,15 @@ async function install(version: string): Promise<void> {
     await io.cp(binDir, destination, { recursive: true, copySourceDirectory: false });
     core.info(`Successfully moved ${binDir} to ${destination}`);
 
+    // Guard against a silently-empty install (e.g. an unexpected archive
+    // layout): make sure the `pulumi` binary actually landed before we add the
+    // directory to PATH, so failures surface here instead of as a confusing
+    // "command not found" in a later step.
+    const binName = platform === 'windows' ? 'pulumi.exe' : 'pulumi';
+    if (!fs.existsSync(path.join(destination, binName))) {
+        throw new Error(`Pulumi CLI install failed: ${binName} not found in ${destination} after extracting ${downloadURL}`);
+    }
+
     const cachedPath = await tc.cacheDir(destination, 'pulumi', version);
     core.addPath(cachedPath);
 
