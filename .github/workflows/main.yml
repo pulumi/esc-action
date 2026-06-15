@@ -24,22 +24,22 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-      - name: Install ESC CLI
+      - name: Install Pulumi CLI
         uses: ./
       - name: Verify CLI exists
-        run: esc version
+        run: pulumi version
   test-cli-download-specific-version:
     strategy: {matrix: {os: [ubuntu-latest, windows-latest]}}
     runs-on: ${{ matrix.os }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-      - name: Install ESC CLI
+      - name: Install Pulumi CLI
         uses: ./
         with:
-          version: '0.10.0'
+          version: '3.246.0'
       - name: Verify CLI exists
-        run: esc version
+        run: pulumi version
   test-individual-keys:
     strategy: {matrix: {os: [ubuntu-latest]}}
     runs-on: ${{ matrix.os }}

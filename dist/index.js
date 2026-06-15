@@ -1,14 +1,14 @@
 import * as require$$0$1 from 'os';
 import require$$0__default from 'os';
 import require$$0$2 from 'crypto';
-import * as require$$1 from 'fs';
-import require$$1__default from 'fs';
-import * as require$$1$1 from 'path';
-import require$$1__default$1 from 'path';
+import * as fs from 'fs';
+import fs__default from 'fs';
+import * as path from 'path';
+import path__default from 'path';
 import require$$2 from 'http';
 import require$$3 from 'https';
 import require$$0$5 from 'net';
-import require$$1$2 from 'tls';
+import require$$1 from 'tls';
 import require$$4, { EventEmitter } from 'events';
 import require$$0$4 from 'assert';
 import require$$0$3 from 'util';
@@ -17,20 +17,20 @@ import require$$7 from 'buffer';
 import require$$8 from 'querystring';
 import require$$14 from 'stream/web';
 import require$$0$7 from 'node:stream';
-import require$$1$3 from 'node:util';
+import require$$1$1 from 'node:util';
 import require$$0$6 from 'node:events';
 import require$$0$8 from 'worker_threads';
 import require$$2$1 from 'perf_hooks';
 import require$$5 from 'util/types';
 import require$$4$1 from 'async_hooks';
-import require$$1$4 from 'console';
+import require$$1$2 from 'console';
 import require$$0$9 from 'url';
 import zlib from 'zlib';
 import require$$6 from 'string_decoder';
 import require$$0$a from 'diagnostics_channel';
 import require$$2$2 from 'child_process';
 import require$$6$1 from 'timers';
-import require$$1$5 from 'tty';
+import require$$1$3 from 'tty';
 
 var commonjsGlobal = typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};
 
@@ -230,7 +230,7 @@ function requireFileCommand () {
 	// We use any as a valid input type
 	/* eslint-disable @typescript-eslint/no-explicit-any */
 	const crypto = __importStar(require$$0$2);
-	const fs = __importStar(require$$1__default);
+	const fs = __importStar(fs__default);
 	const os = __importStar(require$$0__default);
 	const utils_1 = requireUtils$1();
 	function issueFileCommand(command, message) {
@@ -367,7 +367,7 @@ var hasRequiredTunnel$1;
 function requireTunnel$1 () {
 	if (hasRequiredTunnel$1) return tunnel$1;
 	hasRequiredTunnel$1 = 1;
-	var tls = require$$1$2;
+	var tls = require$$1;
 	var http = require$$2;
 	var https = require$$3;
 	var events = require$$4;
@@ -1749,7 +1749,7 @@ function requireSbmh () {
 	 * by Hongli Lai at: https://github.com/FooBarWidget/boyer-moore-horspool
 	 */
 	const EventEmitter = require$$0$6.EventEmitter;
-	const inherits = require$$1$3.inherits;
+	const inherits = require$$1$1.inherits;
 
 	function SBMH (needle) {
 	  if (typeof needle === 'string') {
@@ -1958,7 +1958,7 @@ function requirePartStream () {
 	if (hasRequiredPartStream) return PartStream_1;
 	hasRequiredPartStream = 1;
 
-	const inherits = require$$1$3.inherits;
+	const inherits = require$$1$1.inherits;
 	const ReadableStream = require$$0$7.Readable;
 
 	function PartStream (opts) {
@@ -2004,7 +2004,7 @@ function requireHeaderParser () {
 	hasRequiredHeaderParser = 1;
 
 	const EventEmitter = require$$0$6.EventEmitter;
-	const inherits = require$$1$3.inherits;
+	const inherits = require$$1$1.inherits;
 	const getLimit = requireGetLimit();
 
 	const StreamSearch = requireSbmh();
@@ -2112,7 +2112,7 @@ function requireDicer () {
 	hasRequiredDicer = 1;
 
 	const WritableStream = require$$0$7.Writable;
-	const inherits = require$$1$3.inherits;
+	const inherits = require$$1$1.inherits;
 
 	const StreamSearch = requireSbmh();
 
@@ -2689,7 +2689,7 @@ function requireMultipart () {
 	//     -- this will require modifications to utils.parseParams
 
 	const { Readable } = require$$0$7;
-	const { inherits } = require$$1$3;
+	const { inherits } = require$$1$1;
 
 	const Dicer = requireDicer();
 
@@ -3255,7 +3255,7 @@ function requireMain () {
 	hasRequiredMain = 1;
 
 	const WritableStream = require$$0$7.Writable;
-	const { inherits } = require$$1$3;
+	const { inherits } = require$$1$1;
 	const Dicer = requireDicer();
 
 	const MultipartParser = requireMultipart();
@@ -8079,7 +8079,7 @@ function requireConnect () {
 	    let socket;
 	    if (protocol === 'https:') {
 	      if (!tls) {
-	        tls = require$$1$2;
+	        tls = require$$1;
 	      }
 	      servername = servername || options.servername || util.getServerName(host) || null;
 
@@ -14089,7 +14089,7 @@ function requirePendingInterceptorsFormatter () {
 	hasRequiredPendingInterceptorsFormatter = 1;
 
 	const { Transform } = stream;
-	const { Console } = require$$1$4;
+	const { Console } = require$$1$2;
 
 	/**
 	 * Gets the output of `console.table(…)` as a string.
@@ -25195,7 +25195,7 @@ function requireSummary () {
 		Object.defineProperty(exports, "__esModule", { value: true });
 		exports.summary = exports.markdownSummary = exports.SUMMARY_DOCS_URL = exports.SUMMARY_ENV_VAR = void 0;
 		const os_1 = require$$0__default;
-		const fs_1 = require$$1__default;
+		const fs_1 = fs__default;
 		const { access, appendFile, writeFile } = fs_1.promises;
 		exports.SUMMARY_ENV_VAR = 'GITHUB_STEP_SUMMARY';
 		exports.SUMMARY_DOCS_URL = 'https://docs.github.com/actions/using-workflows/workflow-commands-for-github-actions#adding-a-job-summary';
@@ -25501,7 +25501,7 @@ function requirePathUtils () {
 	};
 	Object.defineProperty(pathUtils, "__esModule", { value: true });
 	pathUtils.toPlatformPath = pathUtils.toWin32Path = pathUtils.toPosixPath = void 0;
-	const path = __importStar(require$$1__default$1);
+	const path = __importStar(path__default);
 	/**
 	 * toPosixPath converts the given path to the posix form. On Windows, \\ will be
 	 * replaced with /.
@@ -25587,8 +25587,8 @@ function requireIoUtil () {
 		var _a;
 		Object.defineProperty(exports, "__esModule", { value: true });
 		exports.getCmdPath = exports.tryGetExecutablePath = exports.isRooted = exports.isDirectory = exports.exists = exports.READONLY = exports.UV_FS_O_EXLOCK = exports.IS_WINDOWS = exports.unlink = exports.symlink = exports.stat = exports.rmdir = exports.rm = exports.rename = exports.readlink = exports.readdir = exports.open = exports.mkdir = exports.lstat = exports.copyFile = exports.chmod = void 0;
-		const fs = __importStar(require$$1__default);
-		const path = __importStar(require$$1__default$1);
+		const fs = __importStar(fs__default);
+		const path = __importStar(path__default);
 		_a = fs.promises
 		// export const {open} = 'fs'
 		, exports.chmod = _a.chmod, exports.copyFile = _a.copyFile, exports.lstat = _a.lstat, exports.mkdir = _a.mkdir, exports.open = _a.open, exports.readdir = _a.readdir, exports.readlink = _a.readlink, exports.rename = _a.rename, exports.rm = _a.rm, exports.rmdir = _a.rmdir, exports.stat = _a.stat, exports.symlink = _a.symlink, exports.unlink = _a.unlink;
@@ -25778,7 +25778,7 @@ function requireIo () {
 	Object.defineProperty(io, "__esModule", { value: true });
 	io.findInPath = io.which = io.mkdirP = io.rmRF = io.mv = io.cp = void 0;
 	const assert_1 = require$$0$4;
-	const path = __importStar(require$$1__default$1);
+	const path = __importStar(path__default);
 	const ioUtil = __importStar(requireIoUtil());
 	/**
 	 * Copies a file or folder.
@@ -26086,7 +26086,7 @@ function requireToolrunner () {
 	const os = __importStar(require$$0__default);
 	const events = __importStar(require$$4);
 	const child = __importStar(require$$2$2);
-	const path = __importStar(require$$1__default$1);
+	const path = __importStar(path__default);
 	const io = __importStar(requireIo());
 	const ioUtil = __importStar(requireIoUtil());
 	const timers_1 = require$$6$1;
@@ -26930,7 +26930,7 @@ function requireCore () {
 		const file_command_1 = requireFileCommand();
 		const utils_1 = requireUtils$1();
 		const os = __importStar(require$$0__default);
-		const path = __importStar(require$$1__default$1);
+		const path = __importStar(path__default);
 		const oidc_utils_1 = requireOidcUtils();
 		/**
 		 * The code to exit an action
@@ -28952,7 +28952,7 @@ function requireManifest () {
 		/* eslint @typescript-eslint/no-require-imports: 0 */
 		const os = require$$0__default;
 		const cp = require$$2$2;
-		const fs = require$$1__default;
+		const fs = fs__default;
 		function _findMatch(versionSpec, stable, candidates, archFilter) {
 		    return __awaiter(this, void 0, void 0, function* () {
 		        const platFilter = os.platform();
@@ -29182,10 +29182,10 @@ function requireToolCache () {
 	const core = __importStar(requireCore());
 	const io = __importStar(requireIo());
 	const crypto = __importStar(require$$0$2);
-	const fs = __importStar(require$$1__default);
+	const fs = __importStar(fs__default);
 	const mm = __importStar(requireManifest());
 	const os = __importStar(require$$0__default);
-	const path = __importStar(require$$1__default$1);
+	const path = __importStar(path__default);
 	const httpm = __importStar(requireLib$1());
 	const semver = __importStar(requireSemver());
 	const stream$1 = __importStar(stream);
@@ -41771,7 +41771,7 @@ function requireMimeTypes () {
 		 */
 
 		var db = requireMimeDb();
-		var extname = require$$1__default$1.extname;
+		var extname = path__default.extname;
 
 		/**
 		 * Module variables.
@@ -43512,11 +43512,11 @@ function requireForm_data () {
 	hasRequiredForm_data = 1;
 	var CombinedStream = requireCombined_stream();
 	var util = require$$0$3;
-	var path = require$$1__default$1;
+	var path = path__default;
 	var http = require$$2;
 	var https = require$$3;
 	var parseUrl = require$$0$9.parse;
-	var fs = require$$1__default;
+	var fs = fs__default;
 	var Stream = stream.Stream;
 	var mime = requireMimeTypes();
 	var asynckit = requireAsynckit();
@@ -46148,7 +46148,7 @@ function requireSupportsColor () {
 	if (hasRequiredSupportsColor) return supportsColor_1;
 	hasRequiredSupportsColor = 1;
 	const os = require$$0__default;
-	const tty = require$$1$5;
+	const tty = require$$1$3;
 	const hasFlag = requireHasFlag();
 
 	const {env} = process;
@@ -46294,7 +46294,7 @@ function requireNode () {
 	if (hasRequiredNode) return node.exports;
 	hasRequiredNode = 1;
 	(function (module, exports) {
-		const tty = require$$1$5;
+		const tty = require$$1$3;
 		const util = require$$0$3;
 
 		/**
@@ -52324,7 +52324,7 @@ var axiosRetryModule = /*#__PURE__*/Object.freeze({
 	retryAfter: retryAfter
 });
 
-// Parse the output of `esc open --format dotenv`.
+// Parse the output of `pulumi esc open --format dotenv`.
 //
 // The CLI emits one entry per line as `KEY="VALUE"`, where VALUE is the
 // Go strconv.Quote encoding of the original string. That encoding uses
@@ -52467,12 +52467,12 @@ function getExportEnvironmentVariables(keys) {
     return [mappings, all];
 }
 async function getInstalledVersion() {
-    const installed = await ioExports.which('esc');
+    const installed = await ioExports.which('pulumi');
     if (!installed) {
         return undefined;
     }
     // Return version without 'v' prefix
-    const { exitCode, stdout } = await execExports.getExecOutput('esc', ['version']);
+    const { exitCode, stdout } = await execExports.getExecOutput('pulumi', ['version']);
     if (exitCode === 0 && stdout.trim().startsWith('v')) {
         return stdout.trim().substring(1);
     }
@@ -52481,32 +52481,34 @@ async function getInstalledVersion() {
 async function install(version) {
     const installedVersion = await getInstalledVersion();
     if (installedVersion === version) {
-        coreExports.info('ESC CLI is already installed, skipping installation step.');
+        coreExports.info('Pulumi CLI is already installed, skipping installation step.');
         return;
     }
-    coreExports.startGroup(`Installing ESC CLI v${version}`);
+    coreExports.startGroup(`Installing Pulumi CLI v${version}`);
     if (installedVersion) {
-        coreExports.info(`Already-installed ESC CLI is not version ${version}`);
+        coreExports.info(`Already-installed Pulumi CLI is not version ${version}`);
     }
-    const tmp = require$$1.mkdtempSync('esc-');
-    const destination = require$$1$1.join(require$$0$1.homedir(), '.pulumi', 'esc', 'bin');
+    const tmp = fs.mkdtempSync('pulumi-');
+    const destination = path.join(require$$0$1.homedir(), '.pulumi', 'bin');
     coreExports.info(`Install destination is ${destination}`);
     await ioExports.mkdirP(destination);
     coreExports.debug(`Successfully created ${destination}`);
     const [platform, arch, ext] = coreExports.platform.platform === 'win32' ? ['windows', 'x64', 'zip'] : [coreExports.platform.platform, coreExports.platform.arch, 'tar.gz'];
-    const downloadURL = `https://get.pulumi.com/esc/releases/esc-v${version}-${platform}-${arch}.${ext}`;
+    const downloadURL = `https://get.pulumi.com/releases/sdk/pulumi-v${version}-${platform}-${arch}.${ext}`;
     coreExports.info(`downloading ${downloadURL}`);
     const downloaded = await toolCacheExports.downloadTool(downloadURL);
     coreExports.info(`successfully downloaded ${downloadURL} to ${downloaded}`);
-    const [extract, bin, srcDir] = platform === 'windows' ? [toolCacheExports.extractZip, 'esc.exe', 'bin'] : [toolCacheExports.extractTar, 'esc', ''];
+    const [extract, srcDir] = platform === 'windows' ? [toolCacheExports.extractZip, path.join('pulumi', 'bin')] : [toolCacheExports.extractTar, 'pulumi'];
     const extractedPath = await extract(downloaded, tmp);
     coreExports.info(`Successfully extracted ${downloaded} to ${extractedPath}`);
-    const oldPath = require$$1$1.join(tmp, 'esc', srcDir, bin);
-    const newPath = require$$1$1.join(destination, bin);
-    await ioExports.cp(oldPath, newPath);
-    await ioExports.rmRF(oldPath);
-    coreExports.info(`Successfully moved ${oldPath} to ${newPath}`);
-    const cachedPath = await toolCacheExports.cacheDir(destination, 'esc', version);
+    const binDir = path.join(tmp, srcDir);
+    await ioExports.cp(binDir, destination, { recursive: true, copySourceDirectory: false });
+    coreExports.info(`Successfully moved ${binDir} to ${destination}`);
+    const binName = platform === 'windows' ? 'pulumi.exe' : 'pulumi';
+    if (!fs.existsSync(path.join(destination, binName))) {
+        throw new Error(`Pulumi CLI install failed: ${binName} not found in ${destination} after extracting ${downloadURL}`);
+    }
+    const cachedPath = await toolCacheExports.cacheDir(destination, 'pulumi', version);
     coreExports.addPath(cachedPath);
     coreExports.endGroup();
 }
@@ -52525,7 +52527,7 @@ async function run() {
             },
         });
         // Parse inputs
-        const escVersion = getInput('version', 'VERSION') || await fetch('https://www.pulumi.com/esc/latest-version').then(r => r.text()).then(t => t.trim());
+        const pulumiVersion = getInput('version', 'VERSION') || await fetch('https://www.pulumi.com/latest-version').then(r => r.text()).then(t => t.trim());
         const environment = getInput('environment', 'ENVIRONMENT');
         const keys = getInput('keys', 'KEYS');
         const cloudUrl = getInput('cloud-url', 'CLOUD_URL') || 'https://api.pulumi.com';
@@ -52541,14 +52543,14 @@ async function run() {
             process.env.PULUMI_ACCESS_TOKEN = accessToken;
         }
         /*
-          Install ESC CLI (either the latest or a specific version)
+          Install the Pulumi CLI (either the latest or a specific version).
 
-          The official installation script supports an optional `--version` argument to pin a release.
-          e.g. curl -fsSL https://get.pulumi.com/esc/install.sh | sh -s -- --version 0.10.0
-
-          If no version is specified, it installs the latest automatically.
+          ESC functionality is exposed through the `pulumi esc` (alias of
+          `pulumi env`) subcommands of the Pulumi CLI, so we download the CLI
+          release archive directly. If no version is specified, the latest is
+          installed automatically.
         */
-        await install(escVersion);
+        await install(pulumiVersion);
         if (cloudUrl) {
             // Set the ESC_CLOUD_URL environment variable if provided
             coreExports.info(`Setting PULUMI_BACKEND_URL to ${cloudUrl}`);
@@ -52564,9 +52566,9 @@ async function run() {
             // temporary file by the CLI and exposed here as an env var
             // pointing at the file's path.
             coreExports.startGroup(`Opening ESC environment: ${environment}`);
-            const result = await execExports.getExecOutput('esc', ['open', environment, '--format', 'dotenv'], { silent: true, ignoreReturnCode: true });
+            const result = await execExports.getExecOutput('pulumi', ['esc', 'open', environment, '--format', 'dotenv'], { silent: true, ignoreReturnCode: true });
             if (result.exitCode !== 0) {
-                throw new Error(`\`esc open\` command failed:
+                throw new Error(`\`pulumi esc open\` command failed:
 ${result.stderr}`);
             }
             const dotenv = parseDotenv(result.stdout);
@@ -52597,7 +52599,7 @@ ${result.stderr}`);
                         // line1
                         // line2
                         // EOF
-                        require$$1.appendFileSync(envFilePath, `${to}<<PULUMIESCEOF\n${value}\nPULUMIESCEOF\n`);
+                        fs.appendFileSync(envFilePath, `${to}<<PULUMIESCEOF\n${value}\nPULUMIESCEOF\n`);
                         coreExports.info(`Injected ${to}=${from}`);
                     }
                     else {

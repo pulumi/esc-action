@@ -125,13 +125,13 @@ function getExportEnvironmentVariables(keys: string | undefined): [Record<string
 }
 
 async function getInstalledVersion(): Promise<string | undefined> {
-    const installed = await io.which('esc');
+    const installed = await io.which('pulumi');
     if (!installed) {
         return undefined;
     }
 
     // Return version without 'v' prefix
-    const { exitCode, stdout } = await exec.getExecOutput('esc', ['version']);
+    const { exitCode, stdout } = await exec.getExecOutput('pulumi', ['version']);
     if (exitCode === 0 && stdout.trim().startsWith('v')) {
         return stdout.trim().substring(1);
     }
@@ -142,39 +142,42 @@ async function getInstalledVersion(): Promise<string | undefined> {
 async function install(version: string): Promise<void> {
     const installedVersion = await getInstalledVersion();
     if (installedVersion === version) {
-        core.info('ESC CLI is already installed, skipping installation step.');
+        core.info('Pulumi CLI is already installed, skipping installation step.');
         return;
     }
 
-    core.startGroup(`Installing ESC CLI v${version}`);
+    core.startGroup(`Installing Pulumi CLI v${version}`);
     if (installedVersion) {
-        core.info(`Already-installed ESC CLI is not version ${version}`);
+        core.info(`Already-installed Pulumi CLI is not version ${version}`);
     }
 
-    const tmp = fs.mkdtempSync('esc-');
+    const tmp = fs.mkdtempSync('pulumi-');
 
-    const destination = path.join(os.homedir(), '.pulumi', 'esc', 'bin');
+    const destination = path.join(os.homedir(), '.pulumi', 'bin');
     core.info(`Install destination is ${destination}`);
 
     await io.mkdirP(destination);
     core.debug(`Successfully created ${destination}`);
 
     const [platform, arch, ext] = core.platform.platform === 'win32' ? ['windows', 'x64', 'zip'] : [core.platform.platform, core.platform.arch, 'tar.gz'];
-    const downloadURL = `https://get.pulumi.com/esc/releases/esc-v${version}-${platform}-${arch}.${ext}`;
+    const downloadURL = `https://get.pulumi.com/releases/sdk/pulumi-v${version}-${platform}-${arch}.${ext}`;
     core.info(`downloading ${downloadURL}`);
     const downloaded = await tc.downloadTool(downloadURL);
     core.info(`successfully downloaded ${downloadURL} to ${downloaded}`);
 
-    const [extract, bin, srcDir] = platform === 'windows' ? [tc.extractZip, 'esc.exe', 'bin'] : [tc.extractTar, 'esc', ''];
+    const [extract, srcDir] = platform === 'windows' ? [tc.extractZip, path.join('pulumi', 'bin')] : [tc.extractTar, 'pulumi'];
     const extractedPath = await extract(downloaded, tmp);
     core.info(`Successfully extracted ${downloaded} to ${extractedPath}`);
-    const oldPath = path.join(tmp, 'esc', srcDir, bin);
-    const newPath = path.join(destination, bin);
-    await io.cp(oldPath, newPath);
-    await io.rmRF(oldPath);
-    core.info(`Successfully moved ${oldPath} to ${newPath}`);
+    const binDir = path.join(tmp, srcDir);
+    await io.cp(binDir, destination, { recursive: true, copySourceDirectory: false });
+    core.info(`Successfully moved ${binDir} to ${destination}`);
 
-    const cachedPath = await tc.cacheDir(destination, 'esc', version);
+    const binName = platform === 'windows' ? 'pulumi.exe' : 'pulumi';
+    if (!fs.existsSync(path.join(destination, binName))) {
+        throw new Error(`Pulumi CLI install failed: ${binName} not found in ${destination} after extracting ${downloadURL}`);
+    }
+
+    const cachedPath = await tc.cacheDir(destination, 'pulumi', version);
     core.addPath(cachedPath);
 
     core.endGroup();
@@ -198,7 +201,7 @@ async function run(): Promise<void> {
         });
 
         // Parse inputs
-        const escVersion: string = getInput('version', 'VERSION') || await fetch('https://www.pulumi.com/esc/latest-version').then(r => r.text()).then(t => t.trim());
+        const pulumiVersion: string = getInput('version', 'VERSION') || await fetch('https://www.pulumi.com/latest-version').then(r => r.text()).then(t => t.trim());
         const environment = getInput('environment', 'ENVIRONMENT');
         const keys = getInput('keys', 'KEYS');
         const cloudUrl = getInput('cloud-url', 'CLOUD_URL') || 'https://api.pulumi.com';
@@ -216,14 +219,14 @@ async function run(): Promise<void> {
         }
 
         /*
-          Install ESC CLI (either the latest or a specific version)
+          Install the Pulumi CLI (either the latest or a specific version).
 
-          The official installation script supports an optional `--version` argument to pin a release.
-          e.g. curl -fsSL https://get.pulumi.com/esc/install.sh | sh -s -- --version 0.10.0
-
-          If no version is specified, it installs the latest automatically.
+          ESC functionality is exposed through the `pulumi esc` (alias of
+          `pulumi env`) subcommands of the Pulumi CLI, so we download the CLI
+          release archive directly. If no version is specified, the latest is
+          installed automatically.
         */
-        await install(escVersion);
+        await install(pulumiVersion);
 
         if (cloudUrl) {
             // Set the ESC_CLOUD_URL environment variable if provided
@@ -242,13 +245,13 @@ async function run(): Promise<void> {
             // pointing at the file's path.
             core.startGroup(`Opening ESC environment: ${environment}`);
             const result = await exec.getExecOutput(
-                'esc',
-                ['open', environment, '--format', 'dotenv'],
+                'pulumi',
+                ['esc', 'open', environment, '--format', 'dotenv'],
                 { silent: true, ignoreReturnCode: true }
             );
 
             if (result.exitCode !== 0) {
-                throw new Error(`\`esc open\` command failed:
+                throw new Error(`\`pulumi esc open\` command failed:
 ${result.stderr}`)
             }
 
