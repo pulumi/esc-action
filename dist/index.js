@@ -52498,20 +52498,12 @@ async function install(version) {
     coreExports.info(`downloading ${downloadURL}`);
     const downloaded = await toolCacheExports.downloadTool(downloadURL);
     coreExports.info(`successfully downloaded ${downloadURL} to ${downloaded}`);
-    // The Pulumi CLI archive bundles the `pulumi` binary alongside its language
-    // plugins. Unix tarballs place them directly under `pulumi/`; Windows zips
-    // nest them under `pulumi/bin/`. We install the whole directory so the full
-    // CLI (not just `pulumi esc`) is available to later workflow steps.
     const [extract, srcDir] = platform === 'windows' ? [toolCacheExports.extractZip, path.join('pulumi', 'bin')] : [toolCacheExports.extractTar, 'pulumi'];
     const extractedPath = await extract(downloaded, tmp);
     coreExports.info(`Successfully extracted ${downloaded} to ${extractedPath}`);
     const binDir = path.join(tmp, srcDir);
     await ioExports.cp(binDir, destination, { recursive: true, copySourceDirectory: false });
     coreExports.info(`Successfully moved ${binDir} to ${destination}`);
-    // Guard against a silently-empty install (e.g. an unexpected archive
-    // layout): make sure the `pulumi` binary actually landed before we add the
-    // directory to PATH, so failures surface here instead of as a confusing
-    // "command not found" in a later step.
     const binName = platform === 'windows' ? 'pulumi.exe' : 'pulumi';
     if (!fs.existsSync(path.join(destination, binName))) {
         throw new Error(`Pulumi CLI install failed: ${binName} not found in ${destination} after extracting ${downloadURL}`);
