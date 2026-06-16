@@ -1,4 +1,4 @@
-// Parse the output of `pulumi esc open --format dotenv`.
+// Parse the output of `pulumi env open --format dotenv`.
 //
 // The CLI emits one entry per line as `KEY="VALUE"`, where VALUE is the
 // Go strconv.Quote encoding of the original string. That encoding uses
