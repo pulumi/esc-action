@@ -52324,7 +52324,7 @@ var axiosRetryModule = /*#__PURE__*/Object.freeze({
 	retryAfter: retryAfter
 });
 
-// Parse the output of `pulumi esc open --format dotenv`.
+// Parse the output of `pulumi env open --format dotenv`.
 //
 // The CLI emits one entry per line as `KEY="VALUE"`, where VALUE is the
 // Go strconv.Quote encoding of the original string. That encoding uses
@@ -52545,8 +52545,8 @@ async function run() {
         /*
           Install the Pulumi CLI (either the latest or a specific version).
 
-          ESC functionality is exposed through the `pulumi esc` (alias of
-          `pulumi env`) subcommands of the Pulumi CLI, so we download the CLI
+          ESC functionality is exposed through the `pulumi env`
+          subcommands of the Pulumi CLI, so we download the CLI
           release archive directly. If no version is specified, the latest is
           installed automatically.
         */
@@ -52566,9 +52566,9 @@ async function run() {
             // temporary file by the CLI and exposed here as an env var
             // pointing at the file's path.
             coreExports.startGroup(`Opening ESC environment: ${environment}`);
-            const result = await execExports.getExecOutput('pulumi', ['esc', 'open', environment, '--format', 'dotenv'], { silent: true, ignoreReturnCode: true });
+            const result = await execExports.getExecOutput('pulumi', ['env', 'open', environment, '--format', 'dotenv'], { silent: true, ignoreReturnCode: true });
             if (result.exitCode !== 0) {
-                throw new Error(`\`pulumi esc open\` command failed:
+                throw new Error(`\`pulumi env open\` command failed:
 ${result.stderr}`);
             }
             const dotenv = parseDotenv(result.stdout);

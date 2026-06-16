@@ -8,7 +8,7 @@ With ESC's support for dynamic credentials and automatic secret rotation, you ca
 
 ## Functionality
 
-- If no inputs are passed, this action will download the latest version of the Pulumi CLI for direct use in later steps of the workflow. ESC functionality is provided by the `pulumi esc` subcommands.
+- If no inputs are passed, this action will download the latest version of the Pulumi CLI for direct use in later steps of the workflow. ESC functionality is provided by the `pulumi env` subcommands.
 - If a version is specified, that specific version of the Pulumi CLI will be downloaded.
 - If an `environment` is passed in as an input, the action will inject all environment variables (specifically the keys under `environmentVariables` and projected files under `files`) from the environment into the current action/workflow environment.
 - If mappings are passed via the `export-environment-variables` input - only the mapped secrets from the environment's `environmentVariables` or `files` objects will be injected into the current action.
