@@ -29961,7 +29961,7 @@ const isNumber = typeOfTest('number');
  *
  * @returns {boolean} True if value is an Object, otherwise false
  */
-const isObject = (thing) => thing !== null && typeof thing === 'object';
+const isObject$1 = (thing) => thing !== null && typeof thing === 'object';
 
 /**
  * Determine if a value is a Boolean
@@ -30030,7 +30030,7 @@ const isFileList = kindOfTest('FileList');
  *
  * @returns {boolean} True if value is a Stream, otherwise false
  */
-const isStream = (val) => isObject(val) && isFunction(val.pipe);
+const isStream = (val) => isObject$1(val) && isFunction(val.pipe);
 
 /**
  * Determine if a value is a FormData
@@ -30470,7 +30470,7 @@ const toJSONObject = (obj) => {
 
   const visit = (source, i) => {
 
-    if (isObject(source)) {
+    if (isObject$1(source)) {
       if (stack.indexOf(source) >= 0) {
         return;
       }
@@ -30499,7 +30499,7 @@ const toJSONObject = (obj) => {
 const isAsyncFn = kindOfTest('AsyncFunction');
 
 const isThenable = (thing) =>
-  thing && (isObject(thing) || isFunction(thing)) && isFunction(thing.then) && isFunction(thing.catch);
+  thing && (isObject$1(thing) || isFunction(thing)) && isFunction(thing.then) && isFunction(thing.catch);
 
 // original code
 // https://github.com/DigitalBrainJS/AxiosPromise/blob/16deab13710ec09779922131f3fa5954320f83ab/lib/utils.js#L11-L34
@@ -30544,7 +30544,7 @@ var utils$1 = {
   isString,
   isNumber,
   isBoolean,
-  isObject,
+  isObject: isObject$1,
   isPlainObject,
   isReadableStream,
   isRequest,
@@ -52368,6 +52368,89 @@ function parseDotenv(stdout) {
     return dotenv;
 }
 
+// Selective masking of injected ESC values.
+//
+// By default the action registers every injected value as a masked secret
+// (`mask: all`). The GitHub runner then masks every *substring* match of each
+// registered value across the run logs and `$GITHUB_STEP_SUMMARY`, so plaintext
+// config that ESC also exports gets masked too -- making logs unreadable and
+// redacting unrelated text. `mask: secrets` restricts masking to values that
+// come from encrypted/secret ESC sources.
+//
+// `pulumi env open --format dotenv` (used for the actual values + materialized
+// files) carries no secret-vs-plaintext signal. `pulumi env open --format detailed` encodes
+// the full `esc.Value` tree where every node is
+// `{ "value": <data|nested>, "secret"?: true, "trace": {...} }`, so it is the
+// reliable source for which keys are secret.
+// Parse the `mask` input. Empty/unset defaults to 'all' (today's behavior, so
+// the env-var fallback keeps working -- see action.yml). Anything other than
+// the two documented values is rejected rather than silently treated as a mode.
+function parseMaskMode(raw) {
+    const val = (raw ?? '').trim();
+    if (val === '' || val === 'all') {
+        return 'all';
+    }
+    if (val === 'secrets') {
+        return 'secrets';
+    }
+    throw new Error(`Invalid value for 'mask': '${raw}'. Must be 'all' or 'secrets'.`);
+}
+function isObject(v) {
+    return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+// A detailed node represents a secret if it -- or any nested node beneath it --
+// is marked secret. Environment-variable and file values are scalars in
+// practice, so this is usually just a flag check; the recursion is defensive.
+function nodeContainsSecret(node) {
+    if (!isObject(node)) {
+        return false;
+    }
+    const detailed = node;
+    if (detailed.secret === true) {
+        return true;
+    }
+    const inner = detailed.value;
+    if (Array.isArray(inner)) {
+        return inner.some(nodeContainsSecret);
+    }
+    if (isObject(inner)) {
+        return Object.values(inner).some(nodeContainsSecret);
+    }
+    return false;
+}
+// Given the stdout of `pulumi env open --format detailed`, return the set of keys --
+// across `environmentVariables` and `files`, the two sections that become env
+// vars -- whose value came from a secret source. Throws if the output is not
+// valid JSON (the caller fails the action rather than risk leaking secrets);
+// tolerates missing sections by returning what it can.
+function collectSecretKeys(detailedStdout) {
+    const keys = new Set();
+    let root;
+    try {
+        root = JSON.parse(detailedStdout);
+    }
+    catch {
+        throw new Error('Could not parse `pulumi env open --format detailed` output as JSON.');
+    }
+    const top = isObject(root) ? root.value : undefined;
+    if (!isObject(top)) {
+        return keys;
+    }
+    for (const section of ['environmentVariables', 'files']) {
+        const sectionNode = top[section];
+        const entries = isObject(sectionNode) ? sectionNode.value : undefined;
+        if (!isObject(entries)) {
+            continue;
+        }
+        for (const [key, node] of Object.entries(entries)) {
+            if (nodeContainsSecret(node)) {
+                keys.add(key);
+            }
+        }
+    }
+    return keys;
+}
+
 // axios-retry v4 exports as CJS, need to access default export
 const axiosRetry = axiosRetry$1 || axiosRetryModule;
 const { exponentialDelay, isNetworkOrIdempotentRequestError } = axiosRetryModule;
@@ -52531,6 +52614,7 @@ async function run() {
         const environment = getInput('environment', 'ENVIRONMENT');
         const keys = getInput('keys', 'KEYS');
         const cloudUrl = getInput('cloud-url', 'CLOUD_URL') || 'https://api.pulumi.com';
+        const maskMode = parseMaskMode(getInput('mask', 'MASK'));
         const [mapping, allVars] = getExportEnvironmentVariables(keys);
         const useOidcAuth = getBooleanInput('oidc-auth', 'OIDC_AUTH');
         if (useOidcAuth) {
@@ -52572,9 +52656,28 @@ async function run() {
 ${result.stderr}`);
             }
             const dotenv = parseDotenv(result.stdout);
-            // Populate step outputs and mark secrets so they do not appear in logs.
+            // When masking only secrets, open the environment a second time with
+            // `--format detailed` to learn which keys came from a secret source --
+            // the dotenv output carries no secret-vs-plaintext signal. This is the
+            // only extra work `mask: secrets` adds; `mask: all` skips it entirely.
+            let secretKeys = null;
+            if (maskMode === 'secrets') {
+                coreExports.info('Determining which values are secret (pulumi env open --format detailed)');
+                const detailed = await execExports.getExecOutput('pulumi', ['env', 'open', environment, '--format', 'detailed'], { silent: true, ignoreReturnCode: true });
+                if (detailed.exitCode !== 0) {
+                    throw new Error(`\`pulumi env open --format detailed\` command failed:
+${detailed.stderr}`);
+                }
+                secretKeys = collectSecretKeys(detailed.stdout);
+            }
+            // Populate step outputs and mask values so they do not appear in logs.
+            // Every key is always available as a step output; only masking is gated
+            // by `mask`. With `mask: all` (the default) every value is masked, exactly
+            // as before.
             for (const [key, value] of Object.entries(dotenv)) {
-                coreExports.setSecret(value);
+                if (maskMode === 'all' || secretKeys.has(key)) {
+                    coreExports.setSecret(value);
+                }
                 coreExports.setOutput(key, value);
             }
             // Calculate the final set of mappings. If allVars is true, add identity mappings for all unmapped variables;

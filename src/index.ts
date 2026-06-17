@@ -14,6 +14,7 @@ import {
 import * as axiosRetryModule from 'axios-retry';
 import axios from 'axios';
 import { parseDotenv } from './parse-dotenv.js';
+import { collectSecretKeys, parseMaskMode } from './mask.js';
 
 // axios-retry v4 exports as CJS, need to access default export
 const axiosRetry = (axiosRetryModule as any).default || axiosRetryModule;
@@ -205,6 +206,7 @@ async function run(): Promise<void> {
         const environment = getInput('environment', 'ENVIRONMENT');
         const keys = getInput('keys', 'KEYS');
         const cloudUrl = getInput('cloud-url', 'CLOUD_URL') || 'https://api.pulumi.com';
+        const maskMode = parseMaskMode(getInput('mask', 'MASK'));
         const [mapping, allVars] = getExportEnvironmentVariables(keys);
 
         const useOidcAuth = getBooleanInput('oidc-auth', 'OIDC_AUTH');
@@ -257,9 +259,33 @@ ${result.stderr}`)
 
             const dotenv = parseDotenv(result.stdout);
 
-            // Populate step outputs and mark secrets so they do not appear in logs.
+            // When masking only secrets, open the environment a second time with
+            // `--format detailed` to learn which keys came from a secret source --
+            // the dotenv output carries no secret-vs-plaintext signal. This is the
+            // only extra work `mask: secrets` adds; `mask: all` skips it entirely.
+            let secretKeys: Set<string> | null = null;
+            if (maskMode === 'secrets') {
+                core.info('Determining which values are secret (pulumi env open --format detailed)');
+                const detailed = await exec.getExecOutput(
+                    'pulumi',
+                    ['env', 'open', environment, '--format', 'detailed'],
+                    { silent: true, ignoreReturnCode: true }
+                );
+                if (detailed.exitCode !== 0) {
+                    throw new Error(`\`pulumi env open --format detailed\` command failed:
+${detailed.stderr}`)
+                }
+                secretKeys = collectSecretKeys(detailed.stdout);
+            }
+
+            // Populate step outputs and mask values so they do not appear in logs.
+            // Every key is always available as a step output; only masking is gated
+            // by `mask`. With `mask: all` (the default) every value is masked, exactly
+            // as before.
             for (const [key, value] of Object.entries(dotenv)) {
-                core.setSecret(value);
+                if (maskMode === 'all' || secretKeys!.has(key)) {
+                    core.setSecret(value);
+                }
                 core.setOutput(key, value);
             }
 
