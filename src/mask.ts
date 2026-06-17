@@ -7,8 +7,8 @@
 // redacting unrelated text. `mask: secrets` restricts masking to values that
 // come from encrypted/secret ESC sources.
 //
-// `esc open --format dotenv` (used for the actual values + materialized files)
-// carries no secret-vs-plaintext signal. `esc open --format detailed` encodes
+// `pulumi env open --format dotenv` (used for the actual values + materialized
+// files) carries no secret-vs-plaintext signal. `pulumi env open --format detailed` encodes
 // the full `esc.Value` tree where every node is
 // `{ "value": <data|nested>, "secret"?: true, "trace": {...} }`, so it is the
 // reliable source for which keys are secret.
@@ -29,7 +29,7 @@ export function parseMaskMode(raw: string | undefined): MaskMode {
     throw new Error(`Invalid value for 'mask': '${raw}'. Must be 'all' or 'secrets'.`);
 }
 
-// A node in `esc open --format detailed` output. The `value` field holds the
+// A node in `pulumi env open --format detailed` output. The `value` field holds the
 // resolved data (a scalar, an array of nodes, or an object mapping keys to
 // nodes), and `secret` is true when the node resolved from a secret source.
 interface DetailedNode {
@@ -62,7 +62,7 @@ function nodeContainsSecret(node: unknown): boolean {
     return false;
 }
 
-// Given the stdout of `esc open --format detailed`, return the set of keys --
+// Given the stdout of `pulumi env open --format detailed`, return the set of keys --
 // across `environmentVariables` and `files`, the two sections that become env
 // vars -- whose value came from a secret source. Throws if the output is not
 // valid JSON (the caller fails the action rather than risk leaking secrets);
@@ -74,7 +74,7 @@ export function collectSecretKeys(detailedStdout: string): Set<string> {
     try {
         root = JSON.parse(detailedStdout);
     } catch {
-        throw new Error('Could not parse `esc open --format detailed` output as JSON.');
+        throw new Error('Could not parse `pulumi env open --format detailed` output as JSON.');
     }
 
     const top = isObject(root) ? root.value : undefined;

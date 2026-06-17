@@ -265,14 +265,14 @@ ${result.stderr}`)
             // only extra work `mask: secrets` adds; `mask: all` skips it entirely.
             let secretKeys: Set<string> | null = null;
             if (maskMode === 'secrets') {
-                core.info('Determining which values are secret (esc open --format detailed)');
+                core.info('Determining which values are secret (pulumi env open --format detailed)');
                 const detailed = await exec.getExecOutput(
-                    'esc',
-                    ['open', environment, '--format', 'detailed'],
+                    'pulumi',
+                    ['env', 'open', environment, '--format', 'detailed'],
                     { silent: true, ignoreReturnCode: true }
                 );
                 if (detailed.exitCode !== 0) {
-                    throw new Error(`\`esc open --format detailed\` command failed:
+                    throw new Error(`\`pulumi env open --format detailed\` command failed:
 ${detailed.stderr}`)
                 }
                 secretKeys = collectSecretKeys(detailed.stdout);

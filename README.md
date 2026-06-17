@@ -100,7 +100,7 @@ config can turn `8,561,234` into `8,56***` or `$1.3559` into `$***.3559`.
 Set `mask: secrets` to mask **only** values that come from encrypted/secret ESC
 sources. Plaintext config is then exported and shown in the clear, so the
 collateral redaction above goes away. Secret detection uses
-`esc open --format detailed`, which annotates each value with whether it resolved
+`pulumi env open --format detailed`, which annotates each value with whether it resolved
 from a secret source (the `dotenv` output used for injection carries no such
 signal).
 

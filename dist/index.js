@@ -52377,8 +52377,8 @@ function parseDotenv(stdout) {
 // redacting unrelated text. `mask: secrets` restricts masking to values that
 // come from encrypted/secret ESC sources.
 //
-// `esc open --format dotenv` (used for the actual values + materialized files)
-// carries no secret-vs-plaintext signal. `esc open --format detailed` encodes
+// `pulumi env open --format dotenv` (used for the actual values + materialized
+// files) carries no secret-vs-plaintext signal. `pulumi env open --format detailed` encodes
 // the full `esc.Value` tree where every node is
 // `{ "value": <data|nested>, "secret"?: true, "trace": {...} }`, so it is the
 // reliable source for which keys are secret.
@@ -52418,7 +52418,7 @@ function nodeContainsSecret(node) {
     }
     return false;
 }
-// Given the stdout of `esc open --format detailed`, return the set of keys --
+// Given the stdout of `pulumi env open --format detailed`, return the set of keys --
 // across `environmentVariables` and `files`, the two sections that become env
 // vars -- whose value came from a secret source. Throws if the output is not
 // valid JSON (the caller fails the action rather than risk leaking secrets);
@@ -52430,7 +52430,7 @@ function collectSecretKeys(detailedStdout) {
         root = JSON.parse(detailedStdout);
     }
     catch {
-        throw new Error('Could not parse `esc open --format detailed` output as JSON.');
+        throw new Error('Could not parse `pulumi env open --format detailed` output as JSON.');
     }
     const top = isObject(root) ? root.value : undefined;
     if (!isObject(top)) {
@@ -52662,10 +52662,10 @@ ${result.stderr}`);
             // only extra work `mask: secrets` adds; `mask: all` skips it entirely.
             let secretKeys = null;
             if (maskMode === 'secrets') {
-                coreExports.info('Determining which values are secret (esc open --format detailed)');
-                const detailed = await execExports.getExecOutput('esc', ['open', environment, '--format', 'detailed'], { silent: true, ignoreReturnCode: true });
+                coreExports.info('Determining which values are secret (pulumi env open --format detailed)');
+                const detailed = await execExports.getExecOutput('pulumi', ['env', 'open', environment, '--format', 'detailed'], { silent: true, ignoreReturnCode: true });
                 if (detailed.exitCode !== 0) {
-                    throw new Error(`\`esc open --format detailed\` command failed:
+                    throw new Error(`\`pulumi env open --format detailed\` command failed:
 ${detailed.stderr}`);
                 }
                 secretKeys = collectSecretKeys(detailed.stdout);

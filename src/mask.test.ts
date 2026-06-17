@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import * as assert from 'node:assert/strict';
 import { collectSecretKeys, parseMaskMode } from './mask.js';
 
-// A representative slice of `esc open --format detailed` output: the root is the
+// A representative slice of `pulumi env open --format detailed` output: the root is the
 // opened environment's esc.Value, and every node is wrapped as
 // `{ "value": ..., "secret"?: true, "trace": {...} }`. Here API_KEY and the
 // KUBECONFIG file resolved from secret sources; LOG_LEVEL is plaintext config.
