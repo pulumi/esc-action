@@ -1,12 +1,12 @@
 name: esc-action
-description: GitHub Action to install the ESC CLI and inject environment variables from an ESC environment.
+description: GitHub Action to install the Pulumi CLI and inject environment variables from an ESC environment.
 branding:
   icon: unlock
   color: purple
 author: Pulumi
 inputs:
   version:
-    description: 'Version of ESC CLI to install. If omitted, installs the latest.'
+    description: 'Version of the Pulumi CLI to install (e.g. "3.246.0"). If omitted, installs the latest.'
     required: false
     default: ''
   environment:

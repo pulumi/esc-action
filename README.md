@@ -8,8 +8,8 @@ With ESC's support for dynamic credentials and automatic secret rotation, you ca
 
 ## Functionality
 
-- If no inputs are passed, this action will download the latest version of the Pulumi ESC CLI for direct use in later steps of the workflow. 
-- If a version is specified, that specific version of the CLI will be downloaded.
+- If no inputs are passed, this action will download the latest version of the Pulumi CLI for direct use in later steps of the workflow. ESC functionality is provided by the `pulumi env` subcommands.
+- If a version is specified, that specific version of the Pulumi CLI will be downloaded.
 - If an `environment` is passed in as an input, the action will inject all environment variables (specifically the keys under `environmentVariables` and projected files under `files`) from the environment into the current action/workflow environment.
 - If mappings are passed via the `export-environment-variables` input - only the mapped secrets from the environment's `environmentVariables` or `files` objects will be injected into the current action.
 - All secrets from the environment's `environmentVariable` and `files` objects are available as step outputs
@@ -20,7 +20,7 @@ _NOTE_: All parameters can be passed via environment variables as well as inputs
 
 ### `version` (`ESC_ACTION_VERSION`)
 
-**Optional** The version of the ESC CLI to download. If not specified, the latest version will be downloaded.
+**Optional** The version of the Pulumi CLI to download (e.g. `3.246.0`). If not specified, the latest version will be downloaded.
 
 ### `environment` (`ESC_ACTION_ENVIRONMENT`)
 
@@ -117,24 +117,24 @@ Notes and tradeoffs:
 
 ## Example usage
 
-### Download the latest version of the ESC CLI
+### Download the latest version of the Pulumi CLI
 
 ```yaml
-uses: pulumi/esc-action@v2
+uses: pulumi/esc-action@v3
 ```
 
-### Download a specific version of the ESC CLI
+### Download a specific version of the Pulumi CLI
 
 ```yaml
-uses: pulumi/esc-action@v2
+uses: pulumi/esc-action@v3
 with:
-  version: 0.10.0
+  version: 3.246.0
 ```
 
 ### Open an environment and inject all environment variables
 
 ```yaml
-uses: pulumi/esc-action@v2
+uses: pulumi/esc-action@v3
 with:
   environment: my-org/my-project/my-env
 env:
@@ -144,7 +144,7 @@ env:
 ### Open an environment and inject specific environment variables
 
 ```yaml
-uses: pulumi/esc-action@v2
+uses: pulumi/esc-action@v3
 with:
   environment: my-org/my-project/my-env
   export-environment-variables: SOME_KEY,ANOTHER_KEY,LAST_KEY
@@ -176,7 +176,7 @@ jobs:
           organization: pulumi
           requested-token-type: urn:pulumi:token-type:access_token:organization
       - name: Install and inject ESC environment variables
-        uses: pulumi/esc-action@v2
+        uses: pulumi/esc-action@v3
         with:
           environment: 'pulumi/github/esc-action'
       - name: Verify environment variables were injected
@@ -208,7 +208,7 @@ jobs:
     steps:
       - name: Fetch secrets from ESC
         id: esc-secrets
-        uses: pulumi/esc-action@v2
+        uses: pulumi/esc-action@v3
       - name: pulumi up
         run: pulumi up
         env:
@@ -216,7 +216,7 @@ jobs:
   job-2:
     runs-on: ubuntu-latest
     steps:
-      - uses: pulumi/esc-action@v2
+      - uses: pulumi/esc-action@v3
       - name: list buckets
         run: aws s3 ls
 ```
