@@ -302,3 +302,60 @@ jobs:
           oidc-requested-token-type: urn:pulumi:token-type:access_token:organization
           environment: 'pulumi/github/esc-action'
           cloud-url: https://api.pulumi-staging.io
+  # Validates the process:json-detailed masking path against an unreleased CLI built
+  # from pulumi/pulumi#23810. Repoint PULUMI_PR_REF or delete this job once the format
+  # ships in a released CLI and the version-detect fallback can be exercised normally.
+  test-process-json-detailed-branch-build:
+    runs-on: ubuntu-latest
+    env:
+      PULUMI_PR_REF: fnune/esc-open-compositional-format
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Check out pulumi/pulumi at the PR branch
+        uses: actions/checkout@v4
+        with:
+          repository: pulumi/pulumi
+          ref: ${{ env.PULUMI_PR_REF }}
+          path: pulumi-src
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: pulumi-src/pkg/go.mod
+      # A fake high version so the action's install step no-ops and uses this build.
+      - name: Build Pulumi CLI from the PR branch
+        run: |
+          mkdir -p "$HOME/.pulumi/bin"
+          (cd pulumi-src/pkg && go build -o "$HOME/.pulumi/bin/pulumi" \
+            -ldflags "-X github.com/pulumi/pulumi/sdk/v3/go/common/version.Version=v3.999.0" \
+            ./cmd/pulumi)
+          echo "$HOME/.pulumi/bin" >> "$GITHUB_PATH"
+      - name: Verify the built CLI is on PATH
+        run: pulumi version
+      - name: Authenticate with Pulumi Cloud
+        uses: pulumi/auth-actions@v1
+        with:
+          organization: pulumi
+          requested-token-type: urn:pulumi:token-type:access_token:organization
+          cloud-url: https://api.pulumi-staging.io
+      - name: Open an environment via process:json-detailed
+        id: esc
+        uses: ./
+        with:
+          version: '3.999.0'
+          environment: 'pulumi/github/esc-action'
+          cloud-url: https://api.pulumi-staging.io
+          export-environment-variables: false
+      - name: Verify injection
+        run: |
+          for var in K1 K2 K3; do
+            if [[ -z "${!var}" ]]; then
+              echo "Error: $var is not set or empty" >&2
+              exit 1
+            fi
+            echo "$var is set"
+          done
+        env:
+          K1: ${{ steps.esc.outputs.FOO }}
+          K2: ${{ steps.esc.outputs.SOME_IMPORTANT_KEY }}
+          K3: ${{ steps.esc.outputs.TEST_ENV }}

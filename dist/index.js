@@ -52368,6 +52368,37 @@ function parseDotenv(stdout) {
     return dotenv;
 }
 
+// The process-environment projection of an opened ESC environment: the flat set
+// of environment variables (and file-path variables) a process would see, each
+// tagged with whether ESC considers it secret.
+//
+// `pulumi env open --format process:json-detailed` emits this directly as a JSON
+// object of `{ "<name>": { "value": string, "secret": boolean } }`. Older CLIs
+// don't support that format, so we fall back to `--format dotenv` and treat
+// every value as secret (the pre-existing, over-masking behavior).
+const ProcessEnvironmentRuntype = libExports.Dictionary(libExports.Record({ value: libExports.String, secret: libExports.Boolean }), libExports.String);
+// Parses the JSON emitted by `pulumi env open --format process:json-detailed`.
+function parseProcessJsonDetailed(stdout) {
+    const parsed = JSON.parse(stdout);
+    return ProcessEnvironmentRuntype.check(parsed);
+}
+// Adapts the legacy `--format dotenv` projection to the same shape. dotenv carries
+// no secret flag, so every value is marked secret, preserving the pre-existing
+// masking behavior on older CLIs.
+function dotenvToProcessEnvironment(dotenv) {
+    const env = {};
+    for (const [key, value] of Object.entries(dotenv)) {
+        env[key] = { value, secret: true };
+    }
+    return env;
+}
+// Reports whether a `pulumi env open` failure was the CLI not recognizing the
+// format, rather than a real error (missing environment, auth failure, ...), so the
+// caller can decide whether to fall back to dotenv.
+function isUnknownFormatError(stderr) {
+    return /unknown output format|not a valid object:encoding pair|unknown output object|unknown output encoding/i.test(stderr);
+}
+
 // axios-retry v4 exports as CJS, need to access default export
 const axiosRetry = axiosRetry$1 || axiosRetryModule;
 const { exponentialDelay, isNetworkOrIdempotentRequestError } = axiosRetryModule;
@@ -52414,14 +52445,17 @@ function getOidcLoginConfig(cloudUrl) {
         organizationName: getInput('oidc-organization', 'OIDC_ORGANIZATION', true),
         requestedTokenType: getInput('oidc-requested-token-type', 'OIDC_REQUESTED_TOKEN_TYPE', true),
         scope: getInput('oidc-scope', 'OIDC_SCOPE') || undefined,
-        expiration: getNumberInput('oidc-token-expiration', 'OIDC_TOKEN_EXPIRATION') || undefined,
+        expiration: getNumberInput('oidc-token-expiration', 'OIDC_TOKEN_EXPIRATION') ||
+            undefined,
         cloudUrl: cloudUrl,
-        exportEnvironmentVariables: false,
+        exportEnvironmentVariables: false
     });
 }
 function getExportEnvironmentVariables(keys) {
     const exportAll = !keys;
-    const keysMapping = keys ? Object.fromEntries(keys.split(',').map(k => [k, k])) : {};
+    const keysMapping = keys
+        ? Object.fromEntries(keys.split(',').map(k => [k, k]))
+        : {};
     // If no value is present for keys, default to pulling mappings from keys.
     const input = getInput('export-environment-variables', 'EXPORT_ENVIRONMENT_VARIABLES');
     if (!input) {
@@ -52492,16 +52526,23 @@ async function install(version) {
     coreExports.info(`Install destination is ${destination}`);
     await ioExports.mkdirP(destination);
     coreExports.debug(`Successfully created ${destination}`);
-    const [platform, arch, ext] = coreExports.platform.platform === 'win32' ? ['windows', 'x64', 'zip'] : [coreExports.platform.platform, coreExports.platform.arch, 'tar.gz'];
+    const [platform, arch, ext] = coreExports.platform.platform === 'win32'
+        ? ['windows', 'x64', 'zip']
+        : [coreExports.platform.platform, coreExports.platform.arch, 'tar.gz'];
     const downloadURL = `https://get.pulumi.com/releases/sdk/pulumi-v${version}-${platform}-${arch}.${ext}`;
     coreExports.info(`downloading ${downloadURL}`);
     const downloaded = await toolCacheExports.downloadTool(downloadURL);
     coreExports.info(`successfully downloaded ${downloadURL} to ${downloaded}`);
-    const [extract, srcDir] = platform === 'windows' ? [toolCacheExports.extractZip, path.join('pulumi', 'bin')] : [toolCacheExports.extractTar, 'pulumi'];
+    const [extract, srcDir] = platform === 'windows'
+        ? [toolCacheExports.extractZip, path.join('pulumi', 'bin')]
+        : [toolCacheExports.extractTar, 'pulumi'];
     const extractedPath = await extract(downloaded);
     coreExports.info(`Successfully extracted ${downloaded} to ${extractedPath}`);
     const binDir = path.join(extractedPath, srcDir);
-    await ioExports.cp(binDir, destination, { recursive: true, copySourceDirectory: false });
+    await ioExports.cp(binDir, destination, {
+        recursive: true,
+        copySourceDirectory: false
+    });
     coreExports.info(`Successfully moved ${binDir} to ${destination}`);
     const binName = platform === 'windows' ? 'pulumi.exe' : 'pulumi';
     if (!require$$1.existsSync(path.join(destination, binName))) {
@@ -52510,6 +52551,28 @@ async function install(version) {
     const cachedPath = await toolCacheExports.cacheDir(destination, 'pulumi', version);
     coreExports.addPath(cachedPath);
     coreExports.endGroup();
+}
+async function openProcessEnvironment(environment) {
+    const open = (format) => execExports.getExecOutput('pulumi', ['env', 'open', environment, '--format', format], {
+        silent: true,
+        ignoreReturnCode: true
+    });
+    const failed = (r) => {
+        throw new Error(`\`pulumi env open\` command failed:\n${r.stderr}`);
+    };
+    // Prefer the structured projection: its per-value secret flag lets us mask only
+    // real secrets. Older CLIs lack the format; dotenv has no flag, so its fallback
+    // masks every value.
+    const detailed = await open('process:json-detailed');
+    if (detailed.exitCode === 0)
+        return parseProcessJsonDetailed(detailed.stdout);
+    if (!isUnknownFormatError(detailed.stderr))
+        failed(detailed);
+    coreExports.info('Pulumi CLI lacks `--format process:json-detailed`; falling back to dotenv (all values masked).');
+    const dotenv = await open('dotenv');
+    if (dotenv.exitCode !== 0)
+        failed(dotenv);
+    return dotenvToProcessEnvironment(parseDotenv(dotenv.stdout));
 }
 async function run() {
     try {
@@ -52523,10 +52586,13 @@ async function run() {
             },
             onRetry: (retryCount, error, requestConfig) => {
                 coreExports.info(`Retrying ${requestConfig.url} (attempt ${retryCount}/5): ${error.message}`);
-            },
+            }
         });
         // Parse inputs
-        const pulumiVersion = getInput('version', 'VERSION') || await fetch('https://www.pulumi.com/latest-version').then(r => r.text()).then(t => t.trim());
+        const pulumiVersion = getInput('version', 'VERSION') ||
+            (await fetch('https://www.pulumi.com/latest-version')
+                .then(r => r.text())
+                .then(t => t.trim()));
         const environment = getInput('environment', 'ENVIRONMENT');
         const keys = getInput('keys', 'KEYS');
         const cloudUrl = getInput('cloud-url', 'CLOUD_URL') || 'https://api.pulumi.com';
@@ -52542,13 +52608,13 @@ async function run() {
             process.env.PULUMI_ACCESS_TOKEN = accessToken;
         }
         /*
-          Install the Pulumi CLI (either the latest or a specific version).
-
-          ESC functionality is exposed through the `pulumi env`
-          subcommands of the Pulumi CLI, so we download the CLI
-          release archive directly. If no version is specified, the latest is
-          installed automatically.
-        */
+              Install the Pulumi CLI (either the latest or a specific version).
+    
+              ESC functionality is exposed through the `pulumi env`
+              subcommands of the Pulumi CLI, so we download the CLI
+              release archive directly. If no version is specified, the latest is
+              installed automatically.
+            */
         await install(pulumiVersion);
         if (cloudUrl) {
             // Set the ESC_CLOUD_URL environment variable if provided
@@ -52559,45 +52625,29 @@ async function run() {
         //
         // Check if an environment was provided. If not, skip injection.
         if (environment) {
-            // Open the environment. The dotenv format is used because it
-            // includes environment variables as well as file references --
-            // each entry in the environment's `files` is materialized to a
-            // temporary file by the CLI and exposed here as an env var
-            // pointing at the file's path.
             coreExports.startGroup(`Opening ESC environment: ${environment}`);
-            const result = await execExports.getExecOutput('pulumi', ['env', 'open', environment, '--format', 'dotenv'], { silent: true, ignoreReturnCode: true });
-            if (result.exitCode !== 0) {
-                throw new Error(`\`pulumi env open\` command failed:
-${result.stderr}`);
-            }
-            const dotenv = parseDotenv(result.stdout);
-            // Populate step outputs and mark secrets so they do not appear in logs.
-            for (const [key, value] of Object.entries(dotenv)) {
-                coreExports.setSecret(value);
+            const env = await openProcessEnvironment(environment);
+            for (const [key, { value, secret }] of Object.entries(env)) {
+                if (secret) {
+                    coreExports.setSecret(value);
+                }
                 coreExports.setOutput(key, value);
             }
-            // Calculate the final set of mappings. If allVars is true, add identity mappings for all unmapped variables;
-            // otherwise, just use the user's mappings.
             if (allVars) {
                 const mapped = new Set(Object.values(mapping));
-                for (const k of Object.keys(dotenv).filter(k => !mapped.has(k))) {
+                for (const k of Object.keys(env).filter(k => !mapped.has(k))) {
                     mapping[k] = k;
                 }
             }
-            // Export envvars.
             if (Object.keys(mapping).length != 0) {
                 const envFilePath = process.env.GITHUB_ENV;
                 if (!envFilePath) {
                     throw new Error('GITHUB_ENV is not defined. Cannot append environment variables.');
                 }
                 for (const [to, from] of Object.entries(mapping)) {
-                    const value = dotenv[from];
+                    const value = env[from]?.value;
                     if (value) {
-                        // Append in multiline syntax to handle any newlines safely
-                        // e.g.: MY_ENV_VAR<<EOF
-                        // line1
-                        // line2
-                        // EOF
+                        // Heredoc syntax so values containing newlines (e.g. PEM keys) survive.
                         require$$1.appendFileSync(envFilePath, `${to}<<PULUMIESCEOF\n${value}\nPULUMIESCEOF\n`);
                         coreExports.info(`Injected ${to}=${from}`);
                     }
