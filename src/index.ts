@@ -186,8 +186,6 @@ async function install(version: string): Promise<void> {
     core.info(`Already-installed Pulumi CLI is not version ${version}`)
   }
 
-  const tmp = fs.mkdtempSync('pulumi-')
-
   const destination = path.join(os.homedir(), '.pulumi', 'bin')
   core.info(`Install destination is ${destination}`)
 
@@ -207,9 +205,9 @@ async function install(version: string): Promise<void> {
     platform === 'windows'
       ? [tc.extractZip, path.join('pulumi', 'bin')]
       : [tc.extractTar, 'pulumi']
-  const extractedPath = await extract(downloaded, tmp)
+  const extractedPath = await extract(downloaded)
   core.info(`Successfully extracted ${downloaded} to ${extractedPath}`)
-  const binDir = path.join(tmp, srcDir)
+  const binDir = path.join(extractedPath, srcDir)
   await io.cp(binDir, destination, {
     recursive: true,
     copySourceDirectory: false

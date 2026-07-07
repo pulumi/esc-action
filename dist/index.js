@@ -1,14 +1,14 @@
 import * as require$$0$1 from 'os';
 import require$$0__default from 'os';
 import require$$0$2 from 'crypto';
-import * as fs from 'fs';
-import fs__default from 'fs';
+import * as require$$1 from 'fs';
+import require$$1__default from 'fs';
 import * as path from 'path';
 import path__default from 'path';
 import require$$2 from 'http';
 import require$$3 from 'https';
 import require$$0$5 from 'net';
-import require$$1 from 'tls';
+import require$$1$1 from 'tls';
 import require$$4, { EventEmitter } from 'events';
 import require$$0$4 from 'assert';
 import require$$0$3 from 'util';
@@ -17,20 +17,20 @@ import require$$7 from 'buffer';
 import require$$8 from 'querystring';
 import require$$14 from 'stream/web';
 import require$$0$7 from 'node:stream';
-import require$$1$1 from 'node:util';
+import require$$1$2 from 'node:util';
 import require$$0$6 from 'node:events';
 import require$$0$8 from 'worker_threads';
 import require$$2$1 from 'perf_hooks';
 import require$$5 from 'util/types';
 import require$$4$1 from 'async_hooks';
-import require$$1$2 from 'console';
+import require$$1$3 from 'console';
 import require$$0$9 from 'url';
 import zlib from 'zlib';
 import require$$6 from 'string_decoder';
 import require$$0$a from 'diagnostics_channel';
 import require$$2$2 from 'child_process';
 import require$$6$1 from 'timers';
-import require$$1$3 from 'tty';
+import require$$1$4 from 'tty';
 
 var commonjsGlobal = typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};
 
@@ -230,7 +230,7 @@ function requireFileCommand () {
 	// We use any as a valid input type
 	/* eslint-disable @typescript-eslint/no-explicit-any */
 	const crypto = __importStar(require$$0$2);
-	const fs = __importStar(fs__default);
+	const fs = __importStar(require$$1__default);
 	const os = __importStar(require$$0__default);
 	const utils_1 = requireUtils$1();
 	function issueFileCommand(command, message) {
@@ -367,7 +367,7 @@ var hasRequiredTunnel$1;
 function requireTunnel$1 () {
 	if (hasRequiredTunnel$1) return tunnel$1;
 	hasRequiredTunnel$1 = 1;
-	var tls = require$$1;
+	var tls = require$$1$1;
 	var http = require$$2;
 	var https = require$$3;
 	var events = require$$4;
@@ -1749,7 +1749,7 @@ function requireSbmh () {
 	 * by Hongli Lai at: https://github.com/FooBarWidget/boyer-moore-horspool
 	 */
 	const EventEmitter = require$$0$6.EventEmitter;
-	const inherits = require$$1$1.inherits;
+	const inherits = require$$1$2.inherits;
 
 	function SBMH (needle) {
 	  if (typeof needle === 'string') {
@@ -1958,7 +1958,7 @@ function requirePartStream () {
 	if (hasRequiredPartStream) return PartStream_1;
 	hasRequiredPartStream = 1;
 
-	const inherits = require$$1$1.inherits;
+	const inherits = require$$1$2.inherits;
 	const ReadableStream = require$$0$7.Readable;
 
 	function PartStream (opts) {
@@ -2004,7 +2004,7 @@ function requireHeaderParser () {
 	hasRequiredHeaderParser = 1;
 
 	const EventEmitter = require$$0$6.EventEmitter;
-	const inherits = require$$1$1.inherits;
+	const inherits = require$$1$2.inherits;
 	const getLimit = requireGetLimit();
 
 	const StreamSearch = requireSbmh();
@@ -2112,7 +2112,7 @@ function requireDicer () {
 	hasRequiredDicer = 1;
 
 	const WritableStream = require$$0$7.Writable;
-	const inherits = require$$1$1.inherits;
+	const inherits = require$$1$2.inherits;
 
 	const StreamSearch = requireSbmh();
 
@@ -2689,7 +2689,7 @@ function requireMultipart () {
 	//     -- this will require modifications to utils.parseParams
 
 	const { Readable } = require$$0$7;
-	const { inherits } = require$$1$1;
+	const { inherits } = require$$1$2;
 
 	const Dicer = requireDicer();
 
@@ -3255,7 +3255,7 @@ function requireMain () {
 	hasRequiredMain = 1;
 
 	const WritableStream = require$$0$7.Writable;
-	const { inherits } = require$$1$1;
+	const { inherits } = require$$1$2;
 	const Dicer = requireDicer();
 
 	const MultipartParser = requireMultipart();
@@ -8079,7 +8079,7 @@ function requireConnect () {
 	    let socket;
 	    if (protocol === 'https:') {
 	      if (!tls) {
-	        tls = require$$1;
+	        tls = require$$1$1;
 	      }
 	      servername = servername || options.servername || util.getServerName(host) || null;
 
@@ -14089,7 +14089,7 @@ function requirePendingInterceptorsFormatter () {
 	hasRequiredPendingInterceptorsFormatter = 1;
 
 	const { Transform } = stream;
-	const { Console } = require$$1$2;
+	const { Console } = require$$1$3;
 
 	/**
 	 * Gets the output of `console.table(…)` as a string.
@@ -25195,7 +25195,7 @@ function requireSummary () {
 		Object.defineProperty(exports, "__esModule", { value: true });
 		exports.summary = exports.markdownSummary = exports.SUMMARY_DOCS_URL = exports.SUMMARY_ENV_VAR = void 0;
 		const os_1 = require$$0__default;
-		const fs_1 = fs__default;
+		const fs_1 = require$$1__default;
 		const { access, appendFile, writeFile } = fs_1.promises;
 		exports.SUMMARY_ENV_VAR = 'GITHUB_STEP_SUMMARY';
 		exports.SUMMARY_DOCS_URL = 'https://docs.github.com/actions/using-workflows/workflow-commands-for-github-actions#adding-a-job-summary';
@@ -25587,7 +25587,7 @@ function requireIoUtil () {
 		var _a;
 		Object.defineProperty(exports, "__esModule", { value: true });
 		exports.getCmdPath = exports.tryGetExecutablePath = exports.isRooted = exports.isDirectory = exports.exists = exports.READONLY = exports.UV_FS_O_EXLOCK = exports.IS_WINDOWS = exports.unlink = exports.symlink = exports.stat = exports.rmdir = exports.rm = exports.rename = exports.readlink = exports.readdir = exports.open = exports.mkdir = exports.lstat = exports.copyFile = exports.chmod = void 0;
-		const fs = __importStar(fs__default);
+		const fs = __importStar(require$$1__default);
 		const path = __importStar(path__default);
 		_a = fs.promises
 		// export const {open} = 'fs'
@@ -28952,7 +28952,7 @@ function requireManifest () {
 		/* eslint @typescript-eslint/no-require-imports: 0 */
 		const os = require$$0__default;
 		const cp = require$$2$2;
-		const fs = fs__default;
+		const fs = require$$1__default;
 		function _findMatch(versionSpec, stable, candidates, archFilter) {
 		    return __awaiter(this, void 0, void 0, function* () {
 		        const platFilter = os.platform();
@@ -29182,7 +29182,7 @@ function requireToolCache () {
 	const core = __importStar(requireCore());
 	const io = __importStar(requireIo());
 	const crypto = __importStar(require$$0$2);
-	const fs = __importStar(fs__default);
+	const fs = __importStar(require$$1__default);
 	const mm = __importStar(requireManifest());
 	const os = __importStar(require$$0__default);
 	const path = __importStar(path__default);
@@ -43516,7 +43516,7 @@ function requireForm_data () {
 	var http = require$$2;
 	var https = require$$3;
 	var parseUrl = require$$0$9.parse;
-	var fs = fs__default;
+	var fs = require$$1__default;
 	var Stream = stream.Stream;
 	var mime = requireMimeTypes();
 	var asynckit = requireAsynckit();
@@ -46148,7 +46148,7 @@ function requireSupportsColor () {
 	if (hasRequiredSupportsColor) return supportsColor_1;
 	hasRequiredSupportsColor = 1;
 	const os = require$$0__default;
-	const tty = require$$1$3;
+	const tty = require$$1$4;
 	const hasFlag = requireHasFlag();
 
 	const {env} = process;
@@ -46294,7 +46294,7 @@ function requireNode () {
 	if (hasRequiredNode) return node.exports;
 	hasRequiredNode = 1;
 	(function (module, exports) {
-		const tty = require$$1$3;
+		const tty = require$$1$4;
 		const util = require$$0$3;
 
 		/**
@@ -52522,7 +52522,6 @@ async function install(version) {
     if (installedVersion) {
         coreExports.info(`Already-installed Pulumi CLI is not version ${version}`);
     }
-    const tmp = fs.mkdtempSync('pulumi-');
     const destination = path.join(require$$0$1.homedir(), '.pulumi', 'bin');
     coreExports.info(`Install destination is ${destination}`);
     await ioExports.mkdirP(destination);
@@ -52537,16 +52536,16 @@ async function install(version) {
     const [extract, srcDir] = platform === 'windows'
         ? [toolCacheExports.extractZip, path.join('pulumi', 'bin')]
         : [toolCacheExports.extractTar, 'pulumi'];
-    const extractedPath = await extract(downloaded, tmp);
+    const extractedPath = await extract(downloaded);
     coreExports.info(`Successfully extracted ${downloaded} to ${extractedPath}`);
-    const binDir = path.join(tmp, srcDir);
+    const binDir = path.join(extractedPath, srcDir);
     await ioExports.cp(binDir, destination, {
         recursive: true,
         copySourceDirectory: false
     });
     coreExports.info(`Successfully moved ${binDir} to ${destination}`);
     const binName = platform === 'windows' ? 'pulumi.exe' : 'pulumi';
-    if (!fs.existsSync(path.join(destination, binName))) {
+    if (!require$$1.existsSync(path.join(destination, binName))) {
         throw new Error(`Pulumi CLI install failed: ${binName} not found in ${destination} after extracting ${downloadURL}`);
     }
     const cachedPath = await toolCacheExports.cacheDir(destination, 'pulumi', version);
@@ -52649,7 +52648,7 @@ async function run() {
                     const value = env[from]?.value;
                     if (value) {
                         // Heredoc syntax so values containing newlines (e.g. PEM keys) survive.
-                        fs.appendFileSync(envFilePath, `${to}<<PULUMIESCEOF\n${value}\nPULUMIESCEOF\n`);
+                        require$$1.appendFileSync(envFilePath, `${to}<<PULUMIESCEOF\n${value}\nPULUMIESCEOF\n`);
                         coreExports.info(`Injected ${to}=${from}`);
                     }
                     else {
