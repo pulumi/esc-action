@@ -14,6 +14,7 @@ import {
 import * as axiosRetryModule from 'axios-retry';
 import axios from 'axios';
 import { parseDotenv } from './parse-dotenv.js';
+import { parseKeysList, parseExportMappings } from './parse-mapping.js';
 
 // axios-retry v4 exports as CJS, need to access default export
 const axiosRetry = (axiosRetryModule as any).default || axiosRetryModule;
@@ -75,7 +76,9 @@ function getOidcLoginConfig(cloudUrl: string): rt.Result<OidcLoginConfig> {
 
 function getExportEnvironmentVariables(keys: string | undefined): [Record<string, string>, boolean] {
     const exportAll = !keys;
-    const keysMapping = keys ? Object.fromEntries(keys.split(',').map(k => [k, k])) : {};
+    const keysMapping = keys
+        ? Object.fromEntries(parseKeysList(keys).map(k => [k, k]))
+        : {};
 
     // If no value is present for keys, default to pulling mappings from keys.
     const input = getInput('export-environment-variables', 'EXPORT_ENVIRONMENT_VARIABLES');
@@ -93,6 +96,9 @@ function getExportEnvironmentVariables(keys: string | undefined): [Record<string
     // BAR is the name of the variable to use as the value. If FOO is omitted, BAR is also used as the name of the
     // envvar to set. If BAR is '*', then all unmapped variables are implicitly mapped to themselves.
     //
+    // Entries may be separated by commas, newlines, or both -- this allows the input to be provided either as a
+    // single-line comma-separated list or as a YAML block scalar with one entry per line (or any mix thereof).
+    //
     // For example, the value 'GITHUB_TOKEN=PULUMI_BOT_TOKEN,AWS_KEY_ID,AWS_SECRET_KEY,AWS_SESSION_TOKEN' will export
     // this environment:
     //
@@ -104,24 +110,7 @@ function getExportEnvironmentVariables(keys: string | undefined): [Record<string
     // If the source ESC env also contained other environment variables, they would not be exported. All non-mapped variables
     // can be exported with the identity mapping by including '*' as a key. For example, 'GITHUB_TOKEN=PULUMI_BOT_TOKEN,*`
     // would also export the environment above assuming no other envvars exist in the ESC environment.
-
-    let all = false;
-    const mappings: Record<string, string> = {};
-    for (const mapping of input.split(',').map(v => v.trim())) {
-        if (mapping === '*') {
-            all = true;
-            continue;
-        }
-
-        const eq = mapping.indexOf('=');
-        if (eq === -1) {
-            mappings[mapping] = mapping;
-        } else {
-            const [to, from] = [mapping.slice(0, eq), mapping.slice(eq + 1)];
-            mappings[to] = from;
-        }
-    }
-    return [mappings, all];
+    return parseExportMappings(input);
 }
 
 async function getInstalledVersion(): Promise<string | undefined> {

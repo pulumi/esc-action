@@ -46,6 +46,17 @@ For case (3), each _export mapping_ takes one of the following three forms:
 2. `SECRET`, which maps the ESC secret named `SECRET` to the environment variable `SECRET` (equivalent to `SECRET=SECRET`)
 3. `*`, which adds identity mappings for any unmapped secrets
 
+Mappings may be separated by commas, newlines, or both. This means the value can be given either as
+a single-line comma-separated list (`SOME_KEY,ANOTHER_KEY,LAST_KEY`) or as a YAML block scalar with
+one mapping per line, e.g.:
+
+```yaml
+export-environment-variables: |
+  SOME_KEY
+  ANOTHER_KEY
+  LAST_KEY
+```
+
 ### `oidc-auth` (`ESC_ACTION_OIDC_AUTH`)
 
 **Optional** When this input is `true`, the ESC action will exchange the GitHub workflow's OIDC token for a Pulumi Access Token. This token is not available to other steps. Requires `id-token: write` permission.
