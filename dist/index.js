@@ -52368,6 +52368,66 @@ function parseDotenv(stdout) {
     return dotenv;
 }
 
+// Parse the `keys` and `export-environment-variables` action inputs.
+//
+// Both inputs accept a list of entries. Historically entries could only be
+// separated by commas (`FOO,BAR,BAZ`), but GitHub Actions YAML also commonly
+// supplies list-like values as a block scalar, one entry per line:
+//
+//   export-environment-variables: |
+//     JIRA_API_TOKEN
+//     JIRA_CLOUD_ID
+//     JIRA_WORKSPACE_ID
+//
+// If entries are only split on `,`, a newline-separated block collapses into
+// a single bogus entry containing embedded newlines (since there's no comma
+// to split on), which then fails to match any real key in the opened
+// environment. To support both styles -- and any mix of the two -- entries
+// are split on commas and/or newlines, with surrounding whitespace trimmed
+// and empty entries discarded.
+const SEPARATOR = /[,\n]/;
+function splitEntries(input) {
+    return input
+        .split(SEPARATOR)
+        .map(entry => entry.trim())
+        .filter(entry => entry.length > 0);
+}
+// Parses the deprecated `keys` input: a list of key names to inject as-is.
+function parseKeysList(keys) {
+    return splitEntries(keys);
+}
+// Parses the `export-environment-variables` input (once it's been
+// determined not to be a boolean) into a mapping of destination envvar name
+// to source ESC environment variable name, plus whether unmapped variables
+// should also be exported (triggered by a bare `*` entry).
+//
+// Each entry takes one of the following three forms:
+//
+// 1. `FOO=BAR`, which maps the ESC secret named `BAR` to the environment
+//    variable `FOO`
+// 2. `BAR`, which maps the ESC secret named `BAR` to the environment
+//    variable `BAR` (equivalent to `BAR=BAR`)
+// 3. `*`, which adds identity mappings for any unmapped secrets
+function parseExportMappings(input) {
+    let all = false;
+    const mappings = {};
+    for (const entry of splitEntries(input)) {
+        if (entry === '*') {
+            all = true;
+            continue;
+        }
+        const eq = entry.indexOf('=');
+        if (eq === -1) {
+            mappings[entry] = entry;
+        }
+        else {
+            const [to, from] = [entry.slice(0, eq), entry.slice(eq + 1)];
+            mappings[to] = from;
+        }
+    }
+    return [mappings, all];
+}
+
 // axios-retry v4 exports as CJS, need to access default export
 const axiosRetry = axiosRetry$1 || axiosRetryModule;
 const { exponentialDelay, isNetworkOrIdempotentRequestError } = axiosRetryModule;
@@ -52421,7 +52481,9 @@ function getOidcLoginConfig(cloudUrl) {
 }
 function getExportEnvironmentVariables(keys) {
     const exportAll = !keys;
-    const keysMapping = keys ? Object.fromEntries(keys.split(',').map(k => [k, k])) : {};
+    const keysMapping = keys
+        ? Object.fromEntries(parseKeysList(keys).map(k => [k, k]))
+        : {};
     // If no value is present for keys, default to pulling mappings from keys.
     const input = getInput('export-environment-variables', 'EXPORT_ENVIRONMENT_VARIABLES');
     if (!input) {
@@ -52437,6 +52499,9 @@ function getExportEnvironmentVariables(keys) {
     // BAR is the name of the variable to use as the value. If FOO is omitted, BAR is also used as the name of the
     // envvar to set. If BAR is '*', then all unmapped variables are implicitly mapped to themselves.
     //
+    // Entries may be separated by commas, newlines, or both -- this allows the input to be provided either as a
+    // single-line comma-separated list or as a YAML block scalar with one entry per line (or any mix thereof).
+    //
     // For example, the value 'GITHUB_TOKEN=PULUMI_BOT_TOKEN,AWS_KEY_ID,AWS_SECRET_KEY,AWS_SESSION_TOKEN' will export
     // this environment:
     //
@@ -52448,23 +52513,7 @@ function getExportEnvironmentVariables(keys) {
     // If the source ESC env also contained other environment variables, they would not be exported. All non-mapped variables
     // can be exported with the identity mapping by including '*' as a key. For example, 'GITHUB_TOKEN=PULUMI_BOT_TOKEN,*`
     // would also export the environment above assuming no other envvars exist in the ESC environment.
-    let all = false;
-    const mappings = {};
-    for (const mapping of input.split(',').map(v => v.trim())) {
-        if (mapping === '*') {
-            all = true;
-            continue;
-        }
-        const eq = mapping.indexOf('=');
-        if (eq === -1) {
-            mappings[mapping] = mapping;
-        }
-        else {
-            const [to, from] = [mapping.slice(0, eq), mapping.slice(eq + 1)];
-            mappings[to] = from;
-        }
-    }
-    return [mappings, all];
+    return parseExportMappings(input);
 }
 async function getInstalledVersion() {
     const installed = await ioExports.which('pulumi');
