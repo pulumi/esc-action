@@ -52324,48 +52324,36 @@ var axiosRetryModule = /*#__PURE__*/Object.freeze({
 	retryAfter: retryAfter
 });
 
-// Parse the output of `pulumi env open --format dotenv`.
-//
-// The CLI emits one entry per line as `KEY="VALUE"`, where VALUE is the
-// Go strconv.Quote encoding of the original string. That encoding uses
-// backslash-escape sequences (`\n`, `\r`, `\t`, `\\`, `\"`, and
-// `\uXXXX` for Unicode) and is a strict subset of JSON string syntax
-// for printable strings. JSON.parse handles those escapes correctly,
-// so a multi-line value such as a PEM-encoded key round-trips with its
-// newlines intact rather than arriving as literal `\n` pairs.
-//
-// Lines that do not contain `=`, or that have an empty key or value,
-// are skipped (this also covers blank lines and `# comment` lines).
-//
-// If a line's value isn't a valid JSON string -- e.g. a future
-// strconv.Quote escape that JSON.parse can't represent (`\a`, `\v`,
-// `\xNN`) -- we fall back to bare strip-quote behavior so the parser
-// stays robust.
-function parseDotenv(stdout) {
-    const dotenv = {};
-    const lines = stdout.split('\n');
-    for (const line of lines) {
-        const eq = line.indexOf('=');
-        if (eq < 0) {
+function parseDetailedEnvironmentVariables(stdout) {
+    const values = {};
+    const secrets = new Set();
+    const parsed = JSON.parse(stdout);
+    const envVars = parsed?.value?.environmentVariables?.value;
+    if (!envVars || typeof envVars !== 'object') {
+        return { values, secrets };
+    }
+    for (const [key, node] of Object.entries(envVars)) {
+        const v = node?.value;
+        let str;
+        if (typeof v === 'string') {
+            str = v;
+        }
+        else if (typeof v === 'number' || typeof v === 'boolean') {
+            str = String(v);
+        }
+        else if (v === null || v === undefined) {
+            str = '';
+        }
+        else {
+            // Objects and arrays are not environment variables.
             continue;
         }
-        const key = line.slice(0, eq).trim();
-        const quoted = line.slice(eq + 1);
-        if (!key || !quoted) {
-            continue;
-        }
-        let value;
-        try {
-            value = JSON.parse(quoted);
-        }
-        catch {
-            value = quoted.replace(/(^"|"$)/g, '');
-        }
-        if (typeof value === 'string') {
-            dotenv[key] = value;
+        values[key] = str;
+        if (node?.secret === true) {
+            secrets.add(key);
         }
     }
-    return dotenv;
+    return { values, secrets };
 }
 
 // Parse the `keys` and `export-environment-variables` action inputs.
@@ -52608,21 +52596,20 @@ async function run() {
         //
         // Check if an environment was provided. If not, skip injection.
         if (environment) {
-            // Open the environment. The dotenv format is used because it
-            // includes environment variables as well as file references --
-            // each entry in the environment's `files` is materialized to a
-            // temporary file by the CLI and exposed here as an env var
-            // pointing at the file's path.
+            // Open the environment with the detailed format and extract the environmentVariables.
             coreExports.startGroup(`Opening ESC environment: ${environment}`);
-            const result = await execExports.getExecOutput('pulumi', ['env', 'open', environment, '--format', 'dotenv'], { silent: true, ignoreReturnCode: true });
+            const result = await execExports.getExecOutput('pulumi', ['env', 'open', environment, '--format', 'detailed'], { silent: true, ignoreReturnCode: true });
             if (result.exitCode !== 0) {
                 throw new Error(`\`pulumi env open\` command failed:
 ${result.stderr}`);
             }
-            const dotenv = parseDotenv(result.stdout);
-            // Populate step outputs and mark secrets so they do not appear in logs.
+            const { values: dotenv, secrets } = parseDetailedEnvironmentVariables(result.stdout);
+            // Populate step outputs, masking only secret values so they do not
+            // appear in logs while non-secret values remain readable.
             for (const [key, value] of Object.entries(dotenv)) {
-                coreExports.setSecret(value);
+                if (secrets.has(key)) {
+                    coreExports.setSecret(value);
+                }
                 coreExports.setOutput(key, value);
             }
             // Calculate the final set of mappings. If allVars is true, add identity mappings for all unmapped variables;
