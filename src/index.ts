@@ -13,7 +13,7 @@ import {
 } from '@pulumi/actions-helpers/auth';
 import * as axiosRetryModule from 'axios-retry';
 import axios from 'axios';
-import { parseDotenv } from './parse-dotenv.js';
+import { parseDetailedEnvironmentVariables } from './parse-detailed.js';
 import { parseKeysList, parseExportMappings } from './parse-mapping.js';
 
 // axios-retry v4 exports as CJS, need to access default export
@@ -225,15 +225,11 @@ async function run(): Promise<void> {
         //
         // Check if an environment was provided. If not, skip injection.
         if (environment) {
-            // Open the environment. The dotenv format is used because it
-            // includes environment variables as well as file references --
-            // each entry in the environment's `files` is materialized to a
-            // temporary file by the CLI and exposed here as an env var
-            // pointing at the file's path.
+            // Open the environment with the detailed format and extract the environmentVariables.
             core.startGroup(`Opening ESC environment: ${environment}`);
             const result = await exec.getExecOutput(
                 'pulumi',
-                ['env', 'open', environment, '--format', 'dotenv'],
+                ['env', 'open', environment, '--format', 'detailed'],
                 { silent: true, ignoreReturnCode: true }
             );
 
@@ -242,11 +238,14 @@ async function run(): Promise<void> {
 ${result.stderr}`)
             }
 
-            const dotenv = parseDotenv(result.stdout);
+            const { values: dotenv, secrets } = parseDetailedEnvironmentVariables(result.stdout);
 
-            // Populate step outputs and mark secrets so they do not appear in logs.
+            // Populate step outputs, masking only secret values so they do not
+            // appear in logs while non-secret values remain readable.
             for (const [key, value] of Object.entries(dotenv)) {
-                core.setSecret(value);
+                if (secrets.has(key)) {
+                    core.setSecret(value);
+                }
                 core.setOutput(key, value);
             }
 
