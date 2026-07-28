@@ -52595,16 +52595,15 @@ async function install(version) {
 const DETAILED_FORMAT_MIN_VERSION = '3.255.0';
 // Whether the CLI version supports secret markers in the detailed format.
 function supportsDetailedFormat(version) {
-    const parts = (v) => v.trim().replace(/^v/, '').split(/[-+]/, 1)[0].split('.').map(p => Number(p) || 0);
-    const actual = parts(version);
-    const min = parts(DETAILED_FORMAT_MIN_VERSION);
-    for (let i = 0; i < Math.max(actual.length, min.length); i++) {
-        const diff = (actual[i] ?? 0) - (min[i] ?? 0);
-        if (diff !== 0) {
-            return diff > 0;
-        }
+    // Strip the leading 'v' and any prerelease/build metadata, leaving major.minor.patch.
+    const core = (v) => v.trim().replace(/^v/, '').split(/[-+]/)[0];
+    const actual = core(version);
+    // A version we can't parse is assumed to be too old, so we fall back to the dotenv format.
+    if (!/^\d+\.\d+\.\d+$/.test(actual)) {
+        return false;
     }
-    return true;
+    // Numeric collation compares runs of digits as numbers, so 3.100.0 sorts before 3.255.0.
+    return actual.localeCompare(core(DETAILED_FORMAT_MIN_VERSION), 'en', { numeric: true }) >= 0;
 }
 // Open the environment with the detailed format
 async function openEnvironment(environment) {
