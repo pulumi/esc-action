@@ -13,8 +13,10 @@ import {
 } from '@pulumi/actions-helpers/auth';
 import * as axiosRetryModule from 'axios-retry';
 import axios from 'axios';
-import { parseDetailedEnvironmentVariables } from './parse-detailed.js';
+import { parseDetailedEnvironmentVariables, type DetailedEnvironment } from './parse-detailed.js';
+import { parseDotenv } from './parse-dotenv.js';
 import { parseKeysList, parseExportMappings } from './parse-mapping.js';
+import { supportsDetailedFormat, DETAILED_FORMAT_MIN_VERSION } from './version.js';
 
 // axios-retry v4 exports as CJS, need to access default export
 const axiosRetry = (axiosRetryModule as any).default || axiosRetryModule;
@@ -170,6 +172,44 @@ async function install(version: string): Promise<void> {
     core.endGroup();
 }
 
+// Open the environment with the detailed format and extract the
+// environmentVariables along with which of them are secret.
+async function openEnvironment(environment: string): Promise<DetailedEnvironment> {
+    const result = await exec.getExecOutput(
+        'pulumi',
+        ['env', 'open', environment, '--format', 'detailed'],
+        { silent: true, ignoreReturnCode: true }
+    );
+
+    if (result.exitCode !== 0) {
+        throw new Error(`\`pulumi env open\` command failed:
+${result.stderr}`)
+    }
+
+    return parseDetailedEnvironmentVariables(result.stdout);
+}
+
+// Open the environment the way this action did before the detailed format was
+// available. The dotenv format includes environment variables as well as file
+// references -- each entry in the environment's `files` is materialized to a
+// temporary file by the CLI and exposed here as an env var pointing at the
+// file's path. It carries no secret markers, so every value is masked.
+async function openEnvironmentLegacy(environment: string): Promise<DetailedEnvironment> {
+    const result = await exec.getExecOutput(
+        'pulumi',
+        ['env', 'open', environment, '--format', 'dotenv'],
+        { silent: true, ignoreReturnCode: true }
+    );
+
+    if (result.exitCode !== 0) {
+        throw new Error(`\`pulumi env open\` command failed:
+${result.stderr}`)
+    }
+
+    const values = parseDotenv(result.stdout);
+    return { values, secrets: new Set(Object.keys(values)) };
+}
+
 async function run(): Promise<void> {
     try {
         // Configure axios with automatic retry for network errors
@@ -225,20 +265,21 @@ async function run(): Promise<void> {
         //
         // Check if an environment was provided. If not, skip injection.
         if (environment) {
-            // Open the environment with the detailed format and extract the environmentVariables.
             core.startGroup(`Opening ESC environment: ${environment}`);
-            const result = await exec.getExecOutput(
-                'pulumi',
-                ['env', 'open', environment, '--format', 'detailed'],
-                { silent: true, ignoreReturnCode: true }
-            );
 
-            if (result.exitCode !== 0) {
-                throw new Error(`\`pulumi env open\` command failed:
-${result.stderr}`)
+            // CLIs older than DETAILED_FORMAT_MIN_VERSION don't mark secrets in
+            // the detailed format, so fall back to the previous dotenv behavior.
+            const useDetailed = supportsDetailedFormat(pulumiVersion);
+            if (!useDetailed) {
+                core.info(
+                    `Pulumi CLI v${pulumiVersion} is older than v${DETAILED_FORMAT_MIN_VERSION}; ` +
+                    `using the dotenv format and masking all values.`
+                );
             }
 
-            const { values: dotenv, secrets } = parseDetailedEnvironmentVariables(result.stdout);
+            const { values: dotenv, secrets } = useDetailed
+                ? await openEnvironment(environment)
+                : await openEnvironmentLegacy(environment);
 
             // Populate step outputs, masking only secret values so they do not
             // appear in logs while non-secret values remain readable.

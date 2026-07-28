@@ -52356,6 +52356,50 @@ function parseDetailedEnvironmentVariables(stdout) {
     return { values, secrets };
 }
 
+// Parse the output of `pulumi env open --format dotenv`.
+//
+// The CLI emits one entry per line as `KEY="VALUE"`, where VALUE is the
+// Go strconv.Quote encoding of the original string. That encoding uses
+// backslash-escape sequences (`\n`, `\r`, `\t`, `\\`, `\"`, and
+// `\uXXXX` for Unicode) and is a strict subset of JSON string syntax
+// for printable strings. JSON.parse handles those escapes correctly,
+// so a multi-line value such as a PEM-encoded key round-trips with its
+// newlines intact rather than arriving as literal `\n` pairs.
+//
+// Lines that do not contain `=`, or that have an empty key or value,
+// are skipped (this also covers blank lines and `# comment` lines).
+//
+// If a line's value isn't a valid JSON string -- e.g. a future
+// strconv.Quote escape that JSON.parse can't represent (`\a`, `\v`,
+// `\xNN`) -- we fall back to bare strip-quote behavior so the parser
+// stays robust.
+function parseDotenv(stdout) {
+    const dotenv = {};
+    const lines = stdout.split('\n');
+    for (const line of lines) {
+        const eq = line.indexOf('=');
+        if (eq < 0) {
+            continue;
+        }
+        const key = line.slice(0, eq).trim();
+        const quoted = line.slice(eq + 1);
+        if (!key || !quoted) {
+            continue;
+        }
+        let value;
+        try {
+            value = JSON.parse(quoted);
+        }
+        catch {
+            value = quoted.replace(/(^"|"$)/g, '');
+        }
+        if (typeof value === 'string') {
+            dotenv[key] = value;
+        }
+    }
+    return dotenv;
+}
+
 // Parse the `keys` and `export-environment-variables` action inputs.
 //
 // Both inputs accept a list of entries. Historically entries could only be
@@ -52414,6 +52458,33 @@ function parseExportMappings(input) {
         }
     }
     return [mappings, all];
+}
+
+// The `pulumi env open --format detailed` output only marks which values are
+// secret from this CLI version onward. Older CLIs must fall back to the dotenv
+// format, which carries no secret markers.
+const DETAILED_FORMAT_MIN_VERSION = '3.255.0';
+// Compare two dot-separated version strings numerically, ignoring any leading
+// `v` and any prerelease/build suffix (e.g. `3.255.0-alpha.1` compares equal to
+// `3.255.0`). Returns a negative number if a < b, 0 if equal, positive if a > b.
+function compareVersions(a, b) {
+    const parts = (v) => v.trim().replace(/^v/, '').split(/[-+]/, 1)[0].split('.').map(p => Number(p) || 0);
+    const pa = parts(a);
+    const pb = parts(b);
+    const len = Math.max(pa.length, pb.length);
+    for (let i = 0; i < len; i++) {
+        const diff = (pa[i] ?? 0) - (pb[i] ?? 0);
+        if (diff !== 0) {
+            return diff;
+        }
+    }
+    return 0;
+}
+// Whether the given Pulumi CLI version supports the secret markers we rely on
+// in the detailed format. Unparseable versions sort below every release and so
+// take the legacy path, which masks every value.
+function supportsDetailedFormat(version) {
+    return compareVersions(version, DETAILED_FORMAT_MIN_VERSION) >= 0;
 }
 
 // axios-retry v4 exports as CJS, need to access default export
@@ -52548,6 +52619,30 @@ async function install(version) {
     coreExports.addPath(cachedPath);
     coreExports.endGroup();
 }
+// Open the environment with the detailed format and extract the
+// environmentVariables along with which of them are secret.
+async function openEnvironment(environment) {
+    const result = await execExports.getExecOutput('pulumi', ['env', 'open', environment, '--format', 'detailed'], { silent: true, ignoreReturnCode: true });
+    if (result.exitCode !== 0) {
+        throw new Error(`\`pulumi env open\` command failed:
+${result.stderr}`);
+    }
+    return parseDetailedEnvironmentVariables(result.stdout);
+}
+// Open the environment the way this action did before the detailed format was
+// available. The dotenv format includes environment variables as well as file
+// references -- each entry in the environment's `files` is materialized to a
+// temporary file by the CLI and exposed here as an env var pointing at the
+// file's path. It carries no secret markers, so every value is masked.
+async function openEnvironmentLegacy(environment) {
+    const result = await execExports.getExecOutput('pulumi', ['env', 'open', environment, '--format', 'dotenv'], { silent: true, ignoreReturnCode: true });
+    if (result.exitCode !== 0) {
+        throw new Error(`\`pulumi env open\` command failed:
+${result.stderr}`);
+    }
+    const values = parseDotenv(result.stdout);
+    return { values, secrets: new Set(Object.keys(values)) };
+}
 async function run() {
     try {
         // Configure axios with automatic retry for network errors
@@ -52596,14 +52691,17 @@ async function run() {
         //
         // Check if an environment was provided. If not, skip injection.
         if (environment) {
-            // Open the environment with the detailed format and extract the environmentVariables.
             coreExports.startGroup(`Opening ESC environment: ${environment}`);
-            const result = await execExports.getExecOutput('pulumi', ['env', 'open', environment, '--format', 'detailed'], { silent: true, ignoreReturnCode: true });
-            if (result.exitCode !== 0) {
-                throw new Error(`\`pulumi env open\` command failed:
-${result.stderr}`);
+            // CLIs older than DETAILED_FORMAT_MIN_VERSION don't mark secrets in
+            // the detailed format, so fall back to the previous dotenv behavior.
+            const useDetailed = supportsDetailedFormat(pulumiVersion);
+            if (!useDetailed) {
+                coreExports.info(`Pulumi CLI v${pulumiVersion} is older than v${DETAILED_FORMAT_MIN_VERSION}; ` +
+                    `using the dotenv format and masking all values.`);
             }
-            const { values: dotenv, secrets } = parseDetailedEnvironmentVariables(result.stdout);
+            const { values: dotenv, secrets } = useDetailed
+                ? await openEnvironment(environment)
+                : await openEnvironmentLegacy(environment);
             // Populate step outputs, masking only secret values so they do not
             // appear in logs while non-secret values remain readable.
             for (const [key, value] of Object.entries(dotenv)) {
