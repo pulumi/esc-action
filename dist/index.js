@@ -52324,6 +52324,38 @@ var axiosRetryModule = /*#__PURE__*/Object.freeze({
 	retryAfter: retryAfter
 });
 
+function parseDetailedEnvironmentVariables(stdout) {
+    const values = {};
+    const secrets = new Set();
+    const parsed = JSON.parse(stdout);
+    const envVars = parsed?.value?.environmentVariables?.value;
+    if (!envVars || typeof envVars !== 'object') {
+        return { values, secrets };
+    }
+    for (const [key, node] of Object.entries(envVars)) {
+        const v = node?.value;
+        let str;
+        if (typeof v === 'string') {
+            str = v;
+        }
+        else if (typeof v === 'number' || typeof v === 'boolean') {
+            str = String(v);
+        }
+        else if (v === null || v === undefined) {
+            str = '';
+        }
+        else {
+            // Objects and arrays are not environment variables.
+            continue;
+        }
+        values[key] = str;
+        if (node?.secret === true) {
+            secrets.add(key);
+        }
+    }
+    return { values, secrets };
+}
+
 // Parse the output of `pulumi env open --format dotenv`.
 //
 // The CLI emits one entry per line as `KEY="VALUE"`, where VALUE is the
@@ -52560,6 +52592,36 @@ async function install(version) {
     coreExports.addPath(cachedPath);
     coreExports.endGroup();
 }
+const DETAILED_FORMAT_MIN_VERSION = '3.255.0';
+// Whether the CLI version supports secret markers in the detailed format.
+function supportsDetailedFormat(version) {
+    // Strip the leading 'v' and any prerelease/build metadata, leaving major.minor.patch.
+    const core = (v) => v.trim().replace(/^v/, '').split(/[-+]/)[0];
+    const actual = core(version);
+    // A version we can't parse is assumed to be too old, so we fall back to the legacy format.
+    if (!/^\d+\.\d+\.\d+$/.test(actual)) {
+        return false;
+    }
+    return actual.localeCompare(core(DETAILED_FORMAT_MIN_VERSION), 'en', { numeric: true }) >= 0;
+}
+// Open the environment with the detailed format
+async function openEnvironment(environment) {
+    const result = await execExports.getExecOutput('pulumi', ['env', 'open', environment, '--format', 'detailed'], { silent: true, ignoreReturnCode: true });
+    if (result.exitCode !== 0) {
+        throw new Error(`\`pulumi env open\` command failed:
+${result.stderr}`);
+    }
+    return parseDetailedEnvironmentVariables(result.stdout);
+}
+async function openEnvironmentLegacy(environment) {
+    const result = await execExports.getExecOutput('pulumi', ['env', 'open', environment, '--format', 'dotenv'], { silent: true, ignoreReturnCode: true });
+    if (result.exitCode !== 0) {
+        throw new Error(`\`pulumi env open\` command failed:
+${result.stderr}`);
+    }
+    const values = parseDotenv(result.stdout);
+    return { values, secrets: new Set(Object.keys(values)) };
+}
 async function run() {
     try {
         // Configure axios with automatic retry for network errors
@@ -52608,21 +52670,21 @@ async function run() {
         //
         // Check if an environment was provided. If not, skip injection.
         if (environment) {
-            // Open the environment. The dotenv format is used because it
-            // includes environment variables as well as file references --
-            // each entry in the environment's `files` is materialized to a
-            // temporary file by the CLI and exposed here as an env var
-            // pointing at the file's path.
             coreExports.startGroup(`Opening ESC environment: ${environment}`);
-            const result = await execExports.getExecOutput('pulumi', ['env', 'open', environment, '--format', 'dotenv'], { silent: true, ignoreReturnCode: true });
-            if (result.exitCode !== 0) {
-                throw new Error(`\`pulumi env open\` command failed:
-${result.stderr}`);
+            const useDetailed = supportsDetailedFormat(pulumiVersion);
+            if (!useDetailed) {
+                coreExports.info(`Pulumi CLI v${pulumiVersion} is older than v${DETAILED_FORMAT_MIN_VERSION}; ` +
+                    `using the dotenv format and masking all values.`);
             }
-            const dotenv = parseDotenv(result.stdout);
-            // Populate step outputs and mark secrets so they do not appear in logs.
+            const { values: dotenv, secrets } = useDetailed
+                ? await openEnvironment(environment)
+                : await openEnvironmentLegacy(environment);
+            // Populate step outputs, masking only secret values so they do not
+            // appear in logs while non-secret values remain readable.
             for (const [key, value] of Object.entries(dotenv)) {
-                coreExports.setSecret(value);
+                if (secrets.has(key)) {
+                    coreExports.setSecret(value);
+                }
                 coreExports.setOutput(key, value);
             }
             // Calculate the final set of mappings. If allVars is true, add identity mappings for all unmapped variables;
@@ -52669,4 +52731,6 @@ ${result.stderr}`);
     }
 }
 run();
+
+export { supportsDetailedFormat };
 //# sourceMappingURL=index.js.map

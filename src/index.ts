@@ -13,6 +13,7 @@ import {
 } from '@pulumi/actions-helpers/auth';
 import * as axiosRetryModule from 'axios-retry';
 import axios from 'axios';
+import { parseDetailedEnvironmentVariables, type DetailedEnvironment } from './parse-detailed.js';
 import { parseDotenv } from './parse-dotenv.js';
 import { parseKeysList, parseExportMappings } from './parse-mapping.js';
 
@@ -170,6 +171,54 @@ async function install(version: string): Promise<void> {
     core.endGroup();
 }
 
+const DETAILED_FORMAT_MIN_VERSION = '3.255.0';
+
+// Whether the CLI version supports secret markers in the detailed format.
+export function supportsDetailedFormat(version: string): boolean {
+    // Strip the leading 'v' and any prerelease/build metadata, leaving major.minor.patch.
+    const core = (v: string) => v.trim().replace(/^v/, '').split(/[-+]/)[0];
+
+    const actual = core(version);
+    // A version we can't parse is assumed to be too old, so we fall back to the legacy format.
+    if (!/^\d+\.\d+\.\d+$/.test(actual)) {
+        return false;
+    }
+
+    return actual.localeCompare(core(DETAILED_FORMAT_MIN_VERSION), 'en', { numeric: true }) >= 0;
+}
+
+// Open the environment with the detailed format
+async function openEnvironment(environment: string): Promise<DetailedEnvironment> {
+    const result = await exec.getExecOutput(
+        'pulumi',
+        ['env', 'open', environment, '--format', 'detailed'],
+        { silent: true, ignoreReturnCode: true }
+    );
+
+    if (result.exitCode !== 0) {
+        throw new Error(`\`pulumi env open\` command failed:
+${result.stderr}`)
+    }
+
+    return parseDetailedEnvironmentVariables(result.stdout);
+}
+
+async function openEnvironmentLegacy(environment: string): Promise<DetailedEnvironment> {
+    const result = await exec.getExecOutput(
+        'pulumi',
+        ['env', 'open', environment, '--format', 'dotenv'],
+        { silent: true, ignoreReturnCode: true }
+    );
+
+    if (result.exitCode !== 0) {
+        throw new Error(`\`pulumi env open\` command failed:
+${result.stderr}`)
+    }
+
+    const values = parseDotenv(result.stdout);
+    return { values, secrets: new Set(Object.keys(values)) };
+}
+
 async function run(): Promise<void> {
     try {
         // Configure axios with automatic retry for network errors
@@ -225,28 +274,26 @@ async function run(): Promise<void> {
         //
         // Check if an environment was provided. If not, skip injection.
         if (environment) {
-            // Open the environment. The dotenv format is used because it
-            // includes environment variables as well as file references --
-            // each entry in the environment's `files` is materialized to a
-            // temporary file by the CLI and exposed here as an env var
-            // pointing at the file's path.
             core.startGroup(`Opening ESC environment: ${environment}`);
-            const result = await exec.getExecOutput(
-                'pulumi',
-                ['env', 'open', environment, '--format', 'dotenv'],
-                { silent: true, ignoreReturnCode: true }
-            );
 
-            if (result.exitCode !== 0) {
-                throw new Error(`\`pulumi env open\` command failed:
-${result.stderr}`)
+            const useDetailed = supportsDetailedFormat(pulumiVersion);
+            if (!useDetailed) {
+                core.info(
+                    `Pulumi CLI v${pulumiVersion} is older than v${DETAILED_FORMAT_MIN_VERSION}; ` +
+                    `using the dotenv format and masking all values.`
+                );
             }
 
-            const dotenv = parseDotenv(result.stdout);
+            const { values: dotenv, secrets } = useDetailed
+                ? await openEnvironment(environment)
+                : await openEnvironmentLegacy(environment);
 
-            // Populate step outputs and mark secrets so they do not appear in logs.
+            // Populate step outputs, masking only secret values so they do not
+            // appear in logs while non-secret values remain readable.
             for (const [key, value] of Object.entries(dotenv)) {
-                core.setSecret(value);
+                if (secrets.has(key)) {
+                    core.setSecret(value);
+                }
                 core.setOutput(key, value);
             }
 
