@@ -179,12 +179,11 @@ export function supportsDetailedFormat(version: string): boolean {
     const core = (v: string) => v.trim().replace(/^v/, '').split(/[-+]/)[0];
 
     const actual = core(version);
-    // A version we can't parse is assumed to be too old, so we fall back to the dotenv format.
+    // A version we can't parse is assumed to be too old, so we fall back to the legacy format.
     if (!/^\d+\.\d+\.\d+$/.test(actual)) {
         return false;
     }
 
-    // Numeric collation compares runs of digits as numbers, so 3.100.0 sorts before 3.255.0.
     return actual.localeCompare(core(DETAILED_FORMAT_MIN_VERSION), 'en', { numeric: true }) >= 0;
 }
 
