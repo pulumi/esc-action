@@ -52592,10 +52592,8 @@ async function install(version) {
     coreExports.addPath(cachedPath);
     coreExports.endGroup();
 }
-// Older CLIs don't mark secrets in the detailed format.
 const DETAILED_FORMAT_MIN_VERSION = '3.255.0';
 // Whether the CLI version supports secret markers in the detailed format.
-// Unparseable versions sort below every release and take the legacy path.
 function supportsDetailedFormat(version) {
     const parts = (v) => v.trim().replace(/^v/, '').split(/[-+]/, 1)[0].split('.').map(p => Number(p) || 0);
     const actual = parts(version);
@@ -52617,8 +52615,6 @@ ${result.stderr}`);
     }
     return parseDetailedEnvironmentVariables(result.stdout);
 }
-// Open the environment the way this action did before the detailed format was
-// available. The dotenv format carries no secret markers, so all values are masked.
 async function openEnvironmentLegacy(environment) {
     const result = await execExports.getExecOutput('pulumi', ['env', 'open', environment, '--format', 'dotenv'], { silent: true, ignoreReturnCode: true });
     if (result.exitCode !== 0) {
