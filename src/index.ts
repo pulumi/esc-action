@@ -16,7 +16,6 @@ import axios from 'axios';
 import { parseDetailedEnvironmentVariables, type DetailedEnvironment } from './parse-detailed.js';
 import { parseDotenv } from './parse-dotenv.js';
 import { parseKeysList, parseExportMappings } from './parse-mapping.js';
-import { supportsDetailedFormat, DETAILED_FORMAT_MIN_VERSION } from './version.js';
 
 // axios-retry v4 exports as CJS, need to access default export
 const axiosRetry = (axiosRetryModule as any).default || axiosRetryModule;
@@ -172,8 +171,27 @@ async function install(version: string): Promise<void> {
     core.endGroup();
 }
 
-// Open the environment with the detailed format and extract the
-// environmentVariables along with which of them are secret.
+// Older CLIs don't mark secrets in the detailed format.
+const DETAILED_FORMAT_MIN_VERSION = '3.255.0';
+
+// Whether the CLI version supports secret markers in the detailed format.
+// Unparseable versions sort below every release and take the legacy path.
+export function supportsDetailedFormat(version: string): boolean {
+    const parts = (v: string) =>
+        v.trim().replace(/^v/, '').split(/[-+]/, 1)[0].split('.').map(p => Number(p) || 0);
+
+    const actual = parts(version);
+    const min = parts(DETAILED_FORMAT_MIN_VERSION);
+    for (let i = 0; i < Math.max(actual.length, min.length); i++) {
+        const diff = (actual[i] ?? 0) - (min[i] ?? 0);
+        if (diff !== 0) {
+            return diff > 0;
+        }
+    }
+    return true;
+}
+
+// Open the environment with the detailed format
 async function openEnvironment(environment: string): Promise<DetailedEnvironment> {
     const result = await exec.getExecOutput(
         'pulumi',
@@ -190,10 +208,7 @@ ${result.stderr}`)
 }
 
 // Open the environment the way this action did before the detailed format was
-// available. The dotenv format includes environment variables as well as file
-// references -- each entry in the environment's `files` is materialized to a
-// temporary file by the CLI and exposed here as an env var pointing at the
-// file's path. It carries no secret markers, so every value is masked.
+// available. The dotenv format carries no secret markers, so all values are masked.
 async function openEnvironmentLegacy(environment: string): Promise<DetailedEnvironment> {
     const result = await exec.getExecOutput(
         'pulumi',
@@ -267,8 +282,6 @@ async function run(): Promise<void> {
         if (environment) {
             core.startGroup(`Opening ESC environment: ${environment}`);
 
-            // CLIs older than DETAILED_FORMAT_MIN_VERSION don't mark secrets in
-            // the detailed format, so fall back to the previous dotenv behavior.
             const useDetailed = supportsDetailedFormat(pulumiVersion);
             if (!useDetailed) {
                 core.info(

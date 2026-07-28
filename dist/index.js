@@ -52460,33 +52460,6 @@ function parseExportMappings(input) {
     return [mappings, all];
 }
 
-// The `pulumi env open --format detailed` output only marks which values are
-// secret from this CLI version onward. Older CLIs must fall back to the dotenv
-// format, which carries no secret markers.
-const DETAILED_FORMAT_MIN_VERSION = '3.255.0';
-// Compare two dot-separated version strings numerically, ignoring any leading
-// `v` and any prerelease/build suffix (e.g. `3.255.0-alpha.1` compares equal to
-// `3.255.0`). Returns a negative number if a < b, 0 if equal, positive if a > b.
-function compareVersions(a, b) {
-    const parts = (v) => v.trim().replace(/^v/, '').split(/[-+]/, 1)[0].split('.').map(p => Number(p) || 0);
-    const pa = parts(a);
-    const pb = parts(b);
-    const len = Math.max(pa.length, pb.length);
-    for (let i = 0; i < len; i++) {
-        const diff = (pa[i] ?? 0) - (pb[i] ?? 0);
-        if (diff !== 0) {
-            return diff;
-        }
-    }
-    return 0;
-}
-// Whether the given Pulumi CLI version supports the secret markers we rely on
-// in the detailed format. Unparseable versions sort below every release and so
-// take the legacy path, which masks every value.
-function supportsDetailedFormat(version) {
-    return compareVersions(version, DETAILED_FORMAT_MIN_VERSION) >= 0;
-}
-
 // axios-retry v4 exports as CJS, need to access default export
 const axiosRetry = axiosRetry$1 || axiosRetryModule;
 const { exponentialDelay, isNetworkOrIdempotentRequestError } = axiosRetryModule;
@@ -52619,8 +52592,23 @@ async function install(version) {
     coreExports.addPath(cachedPath);
     coreExports.endGroup();
 }
-// Open the environment with the detailed format and extract the
-// environmentVariables along with which of them are secret.
+// Older CLIs don't mark secrets in the detailed format.
+const DETAILED_FORMAT_MIN_VERSION = '3.255.0';
+// Whether the CLI version supports secret markers in the detailed format.
+// Unparseable versions sort below every release and take the legacy path.
+function supportsDetailedFormat(version) {
+    const parts = (v) => v.trim().replace(/^v/, '').split(/[-+]/, 1)[0].split('.').map(p => Number(p) || 0);
+    const actual = parts(version);
+    const min = parts(DETAILED_FORMAT_MIN_VERSION);
+    for (let i = 0; i < Math.max(actual.length, min.length); i++) {
+        const diff = (actual[i] ?? 0) - (min[i] ?? 0);
+        if (diff !== 0) {
+            return diff > 0;
+        }
+    }
+    return true;
+}
+// Open the environment with the detailed format
 async function openEnvironment(environment) {
     const result = await execExports.getExecOutput('pulumi', ['env', 'open', environment, '--format', 'detailed'], { silent: true, ignoreReturnCode: true });
     if (result.exitCode !== 0) {
@@ -52630,10 +52618,7 @@ ${result.stderr}`);
     return parseDetailedEnvironmentVariables(result.stdout);
 }
 // Open the environment the way this action did before the detailed format was
-// available. The dotenv format includes environment variables as well as file
-// references -- each entry in the environment's `files` is materialized to a
-// temporary file by the CLI and exposed here as an env var pointing at the
-// file's path. It carries no secret markers, so every value is masked.
+// available. The dotenv format carries no secret markers, so all values are masked.
 async function openEnvironmentLegacy(environment) {
     const result = await execExports.getExecOutput('pulumi', ['env', 'open', environment, '--format', 'dotenv'], { silent: true, ignoreReturnCode: true });
     if (result.exitCode !== 0) {
@@ -52692,8 +52677,6 @@ async function run() {
         // Check if an environment was provided. If not, skip injection.
         if (environment) {
             coreExports.startGroup(`Opening ESC environment: ${environment}`);
-            // CLIs older than DETAILED_FORMAT_MIN_VERSION don't mark secrets in
-            // the detailed format, so fall back to the previous dotenv behavior.
             const useDetailed = supportsDetailedFormat(pulumiVersion);
             if (!useDetailed) {
                 coreExports.info(`Pulumi CLI v${pulumiVersion} is older than v${DETAILED_FORMAT_MIN_VERSION}; ` +
@@ -52754,4 +52737,6 @@ async function run() {
     }
 }
 run();
+
+export { supportsDetailedFormat };
 //# sourceMappingURL=index.js.map
