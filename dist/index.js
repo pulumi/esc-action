@@ -52400,6 +52400,31 @@ function parseDotenv(stdout) {
     return dotenv;
 }
 
+// Resolve the Pulumi CLI version to install when the caller did not pin one.
+const LATEST_VERSION_URL = 'https://www.pulumi.com/latest-version';
+// `fetch` rejects with a bare `TypeError: fetch failed` and hides the real
+// reason (ENOTFOUND, ECONNRESET, certificate errors, ...) on `cause`. Unfold it
+// so the failure names something the user can act on.
+function describeError(err) {
+    const message = err instanceof Error ? err.message : String(err);
+    const cause = err?.cause;
+    return cause instanceof Error ? `${message}: ${cause.message}` : message;
+}
+async function fetchLatestVersion() {
+    let response;
+    try {
+        response = await fetch(LATEST_VERSION_URL);
+    }
+    catch (err) {
+        throw new Error(`failed to fetch the latest Pulumi CLI version from ${LATEST_VERSION_URL}: ${describeError(err)}`, { cause: err });
+    }
+    if (!response.ok) {
+        throw new Error(`failed to fetch the latest Pulumi CLI version from ${LATEST_VERSION_URL}: ` +
+            `HTTP ${response.status} ${response.statusText}`.trimEnd());
+    }
+    return (await response.text()).trim();
+}
+
 // Parse the `keys` and `export-environment-variables` action inputs.
 //
 // Both inputs accept a list of entries. Historically entries could only be
@@ -52637,7 +52662,7 @@ async function run() {
             },
         });
         // Parse inputs
-        const pulumiVersion = getInput('version', 'VERSION') || await fetch('https://www.pulumi.com/latest-version').then(r => r.text()).then(t => t.trim());
+        const pulumiVersion = getInput('version', 'VERSION') || await fetchLatestVersion();
         const environment = getInput('environment', 'ENVIRONMENT');
         const keys = getInput('keys', 'KEYS');
         const cloudUrl = getInput('cloud-url', 'CLOUD_URL') || 'https://api.pulumi.com';
