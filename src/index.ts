@@ -15,6 +15,7 @@ import * as axiosRetryModule from 'axios-retry';
 import axios from 'axios';
 import { parseDetailedEnvironmentVariables, type DetailedEnvironment } from './parse-detailed.js';
 import { parseDotenv } from './parse-dotenv.js';
+import { fetchLatestVersion } from './latest-version.js';
 import { parseKeysList, parseExportMappings } from './parse-mapping.js';
 
 // axios-retry v4 exports as CJS, need to access default export
@@ -237,7 +238,7 @@ async function run(): Promise<void> {
         });
 
         // Parse inputs
-        const pulumiVersion: string = getInput('version', 'VERSION') || await fetch('https://www.pulumi.com/latest-version').then(r => r.text()).then(t => t.trim());
+        const pulumiVersion: string = getInput('version', 'VERSION') || await fetchLatestVersion();
         const environment = getInput('environment', 'ENVIRONMENT');
         const keys = getInput('keys', 'KEYS');
         const cloudUrl = getInput('cloud-url', 'CLOUD_URL') || 'https://api.pulumi.com';
