@@ -52584,16 +52584,22 @@ async function getInstalledVersion() {
     }
     return undefined;
 }
-async function install(version) {
-    const installedVersion = await getInstalledVersion();
-    if (installedVersion === version) {
-        coreExports.info('Pulumi CLI is already installed, skipping installation step.');
-        return;
-    }
-    coreExports.startGroup(`Installing Pulumi CLI v${version}`);
+async function ensurePulumiCLI(versionInput, forceInstall) {
+    const installedVersion = forceInstall ? undefined : await getInstalledVersion();
     if (installedVersion) {
-        coreExports.info(`Already-installed Pulumi CLI is not version ${version}`);
+        const usable = versionInput ? installedVersion === versionInput : supportsDetailedFormat(installedVersion);
+        if (usable) {
+            coreExports.info(`Pulumi CLI v${installedVersion} is already installed, skipping installation step.`);
+            return installedVersion;
+        }
+        coreExports.info(`Already-installed Pulumi CLI v${installedVersion} is not usable for this run`);
     }
+    const version = versionInput || await fetchLatestVersion();
+    await install(version);
+    return version;
+}
+async function install(version) {
+    coreExports.startGroup(`Installing Pulumi CLI v${version}`);
     const destination = path.join(require$$0$1.homedir(), '.pulumi', 'bin');
     coreExports.info(`Install destination is ${destination}`);
     await ioExports.mkdirP(destination);
@@ -52662,7 +52668,8 @@ async function run() {
             },
         });
         // Parse inputs
-        const pulumiVersion = getInput('version', 'VERSION') || await fetchLatestVersion();
+        const versionInput = getInput('version', 'VERSION');
+        const forceInstall = getBooleanInput('force-install', 'FORCE_INSTALL') ?? false;
         const environment = getInput('environment', 'ENVIRONMENT');
         const keys = getInput('keys', 'KEYS');
         const cloudUrl = getInput('cloud-url', 'CLOUD_URL') || 'https://api.pulumi.com';
@@ -52685,7 +52692,7 @@ async function run() {
           release archive directly. If no version is specified, the latest is
           installed automatically.
         */
-        await install(pulumiVersion);
+        const pulumiVersion = await ensurePulumiCLI(versionInput, forceInstall);
         if (cloudUrl) {
             // Set the ESC_CLOUD_URL environment variable if provided
             coreExports.info(`Setting PULUMI_BACKEND_URL to ${cloudUrl}`);
