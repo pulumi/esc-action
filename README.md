@@ -10,6 +10,7 @@ With ESC's support for dynamic credentials and automatic secret rotation, you ca
 
 - If no inputs are passed, this action will download the latest version of the Pulumi CLI for direct use in later steps of the workflow. ESC functionality is provided by the `pulumi env` subcommands.
 - If a version is specified, that specific version of the Pulumi CLI will be downloaded.
+- If no version is specified and a Pulumi CLI new enough to support all of the action's features (v3.255.0 or later) is already on `PATH`, it is reused and nothing is downloaded. Set `force-install: true` to always download.
 - If an `environment` is passed in as an input, the action will inject all environment variables (specifically the keys under `environmentVariables` and projected files under `files`) from the environment into the current action/workflow environment.
 - If mappings are passed via the `export-environment-variables` input - only the mapped secrets from the environment's `environmentVariables` or `files` objects will be injected into the current action.
 - All secrets from the environment's `environmentVariable` and `files` objects are available as step outputs
@@ -20,7 +21,11 @@ _NOTE_: All parameters can be passed via environment variables as well as inputs
 
 ### `version` (`ESC_ACTION_VERSION`)
 
-**Optional** The version of the Pulumi CLI to download (e.g. `3.246.0`). If not specified, the latest version will be downloaded.
+**Optional** The version of the Pulumi CLI to download (e.g. `3.246.0`). If not specified, the latest version will be downloaded, unless a suitable CLI is already on `PATH`.
+
+### `force-install` (`ESC_ACTION_FORCE_INSTALL`)
+
+**Optional** When `true`, always install the Pulumi CLI, even if a suitable one is already on `PATH`. Defaults to `false`.
 
 ### `environment` (`ESC_ACTION_ENVIRONMENT`)
 

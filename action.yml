@@ -9,6 +9,10 @@ inputs:
     description: 'Version of the Pulumi CLI to install (e.g. "3.246.0"). If omitted, installs the latest.'
     required: false
     default: ''
+  force-install:
+    description: 'When true, always install the Pulumi CLI even if a suitable one is already on PATH.'
+    required: false
+    default: ''
   environment:
     description: 'The ESC environment to pull environment variables from.'
     required: false
