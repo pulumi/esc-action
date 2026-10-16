@@ -1,20 +1,12 @@
 name: esc-action
-description: GitHub Action to install the Pulumi CLI and inject environment variables from an ESC environment.
+description: GitHub Action to inject environment variables and files from a Pulumi ESC environment.
 branding:
   icon: unlock
   color: purple
 author: Pulumi
 inputs:
-  version:
-    description: 'Version of the Pulumi CLI to install (e.g. "3.246.0"). If omitted, installs the latest.'
-    required: false
-    default: ''
   environment:
-    description: 'The ESC environment to pull environment variables from.'
-    required: false
-    default: ''
-  keys:
-    description: 'A comma-separated list of specific keys to inject from within the ESC values.environmentVariables object. E.g. "NPM_TOKEN,SLACK_WEBHOOK_URL".'
+    description: 'The ESC environment to open, as [[<org>/]<project>/]<environment>[@<version>]. A 1-part name is in the "default" project. A name without an org uses the default org of the access token.'
     required: false
     default: ''
   cloud-url:
@@ -22,26 +14,10 @@ inputs:
     required: false
     default: ''
   export-environment-variables:
-    description: "Whether or not to export environment variables. All environment variables will always be available in the 'env' step output."
+    description: "Whether or not to export environment variables, or a list of [ENV=]NAME mappings to export. All environment variables are always available as step outputs."
     required: false
-  oidc-auth:
-    description: 'When true, the ESC action will exchange the GitHub workflow OIDC token for a Pulumi Access Token. Requires id-token: write permission.'
-    required: false
-    default: ''
-  oidc-organization:
-    description: 'The name of the Pulumi organization to use for OIDC token exchange. Required if oidc-auth is true.'
-    required: false
-    default: ''
-  oidc-requested-token-type:
-    description: 'The type of Pulumi Access Token to obtain. Required if oidc-auth is true.'
-    required: false
-    default: ''
-  oidc-scope:
-    description: 'The requested scopes for the Pulumi Access Token.'
-    required: false
-    default: ''
-  oidc-token-expiration:
-    description: 'The time-to-live for the Pulumi Access Token.'
+  pulumi-access-token:
+    description: 'The Pulumi access token to use. Defaults to the PULUMI_ACCESS_TOKEN environment variable.'
     required: false
     default: ''
 runs:

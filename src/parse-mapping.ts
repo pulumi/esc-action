@@ -1,6 +1,6 @@
-// Parse the `keys` and `export-environment-variables` action inputs.
+// Parse the `export-environment-variables` action input.
 //
-// Both inputs accept a list of entries. Historically entries could only be
+// The input accepts a list of entries. Historically entries could only be
 // separated by commas (`FOO,BAR,BAZ`), but GitHub Actions YAML also commonly
 // supplies list-like values as a block scalar, one entry per line:
 //
@@ -22,11 +22,6 @@ function splitEntries(input: string): string[] {
         .split(SEPARATOR)
         .map(entry => entry.trim())
         .filter(entry => entry.length > 0);
-}
-
-// Parses the deprecated `keys` input: a list of key names to inject as-is.
-export function parseKeysList(keys: string): string[] {
-    return splitEntries(keys);
 }
 
 // Parses the `export-environment-variables` input (once it's been

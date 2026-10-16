@@ -1,21 +1,6 @@
 import { test } from 'node:test';
 import * as assert from 'node:assert/strict';
-import { parseKeysList, parseExportMappings } from './parse-mapping.js';
-
-test('parseKeysList splits a comma-separated list', () => {
-    assert.deepEqual(parseKeysList('A,B,C'), ['A', 'B', 'C']);
-});
-
-test('parseKeysList splits a newline-separated list (YAML block scalar)', () => {
-    // This mirrors the customer-reported bug: `export-environment-variables`
-    // (and, historically, `keys`) supplied as a YAML block scalar joins
-    // entries with `\n` rather than `,`.
-    assert.deepEqual(parseKeysList('A\nB\nC'), ['A', 'B', 'C']);
-});
-
-test('parseKeysList trims whitespace and drops empty entries', () => {
-    assert.deepEqual(parseKeysList(' A \n\n B ,C\n'), ['A', 'B', 'C']);
-});
+import { parseExportMappings } from './parse-mapping.js';
 
 test('parseExportMappings supports comma-separated identity and renamed entries', () => {
     const [mappings, all] = parseExportMappings('GITHUB_TOKEN=PULUMI_BOT_TOKEN,AWS_KEY_ID,AWS_SECRET_KEY');
