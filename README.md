@@ -8,11 +8,10 @@ With ESC's support for dynamic credentials and automatic secret rotation, you ca
 
 ## Functionality
 
-- The action opens the ESC `environment` through the Pulumi Cloud API. It does not install the Pulumi CLI.
+- The action opens the ESC `environment` through the Pulumi Cloud API.
 - The action writes each value under the environment's `files` object to a temporary file. The environment variable with the same key holds the path to that file. If a key is in both `environmentVariables` and `files`, the file path wins.
 - All environment variables (the keys under `environmentVariables`, and the file paths) are available as step outputs.
 - By default, the action exports all environment variables to the later steps of the job. The `export-environment-variables` input selects which ones to export.
-- The action masks secret values in the logs. Non-secret values stay readable.
 
 To install the Pulumi CLI, use [pulumi/actions](https://github.com/pulumi/actions). To get a Pulumi access token through OIDC, use [pulumi/auth-actions](https://github.com/pulumi/auth-actions).
 
@@ -24,11 +23,11 @@ _NOTE_: All parameters can be passed via environment variables as well as inputs
 
 **Required** The name of the environment to open. The name takes one of these forms:
 
-| Form | Example | Opens |
-|---|---|---|
-| `<environment>` | `my-env` | `<default org>/default/my-env` |
-| `<project>/<environment>` | `my-project/my-env` | `<default org>/my-project/my-env` |
-| `<org>/<project>/<environment>` | `my-org/my-project/my-env` | `my-org/my-project/my-env` |
+| Form                            | Example                    | Opens                             |
+|---------------------------------|----------------------------|-----------------------------------|
+| `<environment>`                 | `my-env`                   | `<default org>/default/my-env`    |
+| `<project>/<environment>`       | `my-project/my-env`        | `<default org>/my-project/my-env` |
+| `<org>/<project>/<environment>` | `my-org/my-project/my-env` | `my-org/my-project/my-env`        |
 
 Each form can end with `@<version>`, where the version is a revision number or a tag. For example, `my-org/my-project/my-env@stable` opens the revision with the `stable` tag.
 
@@ -131,7 +130,7 @@ jobs:
           echo "TEST_ENV=$TEST_ENV"
 ```
 
-To keep the token out of the environment of later steps, set `export-environment-variables: false` on `pulumi/auth-actions` and pass its output to this action:
+To give this action a token directly, pass it to the `pulumi-access-token` input. The input takes precedence over `PULUMI_ACCESS_TOKEN`:
 
 ```yaml
 - name: Authenticate with Pulumi Cloud
@@ -140,7 +139,6 @@ To keep the token out of the environment of later steps, set `export-environment
   with:
     organization: my-org
     requested-token-type: urn:pulumi:token-type:access_token:organization
-    export-environment-variables: false
 - uses: pulumi/esc-action@v4
   with:
     environment: my-org/my-project/my-env
@@ -168,25 +166,25 @@ jobs:
 
 ## Migrating from v3
 
-v4 is a thin wrapper around the Pulumi Cloud API. It does not download the Pulumi CLI, so it starts much faster.
+v4 talks directly with the Pulumi Cloud API.
 
 - **The action does not install the Pulumi CLI.** If a later step runs `pulumi`, add [pulumi/actions](https://github.com/pulumi/actions) to install it. The `version` input is removed.
 
   ```yaml
-  - uses: pulumi/actions@v7
   - uses: pulumi/esc-action@v4
     with:
       environment: my-org/my-project/my-env
+  - uses: pulumi/actions@v7
   ```
 
 - **The OIDC inputs are removed.** Remove `oidc-auth`, `oidc-organization`, `oidc-requested-token-type`, `oidc-scope` and `oidc-token-expiration`. Use [pulumi/auth-actions](https://github.com/pulumi/auth-actions) before this action instead. Its inputs have the same meaning:
 
-  | v3 input | pulumi/auth-actions input |
-  |---|---|
-  | `oidc-organization` | `organization` |
-  | `oidc-requested-token-type` | `requested-token-type` |
-  | `oidc-scope` | `scope` |
-  | `oidc-token-expiration` | `token-expiration` |
+  | v3 input                    | pulumi/auth-actions input |
+  |-----------------------------|---------------------------|
+  | `oidc-organization`         | `organization`            |
+  | `oidc-requested-token-type` | `requested-token-type`    |
+  | `oidc-scope`                | `scope`                   |
+  | `oidc-token-expiration`     | `token-expiration`        |
 
 - **The `keys` input is removed.** Use `export-environment-variables` with the same list.
 - **The `environment` input is required.** To only install the Pulumi CLI, use [pulumi/actions](https://github.com/pulumi/actions).
