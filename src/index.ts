@@ -1,4 +1,5 @@
 import * as core from '@actions/core';
+import { ApiClient, ApiClientConfiguration, ApiError, ApiService } from '@pulumi/cloud-sdk';
 import { Configuration, EscRawApi, type Value } from '@pulumi/esc-sdk';
 import axios, { type AxiosInstance, isAxiosError } from 'axios';
 import * as axiosRetryModule from 'axios-retry';
@@ -6,6 +7,7 @@ import { randomBytes } from 'crypto';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import { resolveDefaultOrg } from './default-org.js';
 import { parseScalars } from './parse-properties.js';
 import { parseEnvironmentRef, type EnvironmentRef } from './parse-ref.js';
 import { parseExportMappings } from './parse-mapping.js';
@@ -102,6 +104,9 @@ function newHttpClient(): AxiosInstance {
 }
 
 function describeError(error: unknown): string {
+    if (error instanceof ApiError) {
+        return `${error.url}: ${error.message}`;
+    }
     if (!isAxiosError(error)) {
         return error instanceof Error ? error.message : String(error);
     }
@@ -112,34 +117,6 @@ function describeError(error: unknown): string {
     const data = error.response.data;
     const detail = typeof data?.message === 'string' ? data.message : JSON.stringify(data);
     return `${request} failed with status ${error.response.status}: ${detail}`;
-}
-
-// Resolve the org the same way the Pulumi CLI does, minus the CLI's local config file:
-// PULUMI_DEFAULT_ORGANIZATION, then the org that Pulumi Cloud picks as the default, then the user's own org.
-async function resolveDefaultOrg(http: AxiosInstance, cloudUrl: string, accessToken: string): Promise<string> {
-    const fromEnv = process.env.PULUMI_DEFAULT_ORGANIZATION;
-    if (fromEnv) {
-        return fromEnv;
-    }
-
-    const headers = { Authorization: `token ${accessToken}` };
-    try {
-        const { data } = await http.get(`${cloudUrl}/api/user/organizations/default`, { headers });
-        if (data?.gitHubLogin) {
-            return data.gitHubLogin;
-        }
-    } catch (error) {
-        // A backend without the endpoint leaves the choice to the client.
-        if (!isAxiosError(error) || error.response?.status !== 404) {
-            throw error;
-        }
-    }
-
-    const { data } = await http.get(`${cloudUrl}/api/user`, { headers });
-    if (!data?.githubLogin) {
-        throw new Error(`GET ${cloudUrl}/api/user returned no user name`);
-    }
-    return data.githubLogin;
 }
 
 async function openEnvironment(
@@ -194,7 +171,8 @@ async function run(): Promise<void> {
         core.setSecret(accessToken);
 
         const http = newHttpClient();
-        const org = ref.org ?? (await resolveDefaultOrg(http, cloudUrl, accessToken));
+        const cloud = new ApiService(new ApiClient(new ApiClientConfiguration(`${cloudUrl}/api/`, 'esc-action', () => accessToken)));
+        const org = ref.org ?? (await resolveDefaultOrg(cloud.Users));
 
         core.startGroup(`Opening ESC environment: ${org}/${ref.project}/${ref.env}${ref.version ? `@${ref.version}` : ''}`);
         const properties = await openEnvironment(http, cloudUrl, accessToken, { ...ref, org });
