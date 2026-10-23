@@ -1,34 +1,26 @@
 import * as core from '@actions/core';
-import * as exec from '@actions/exec';
-import * as io from '@actions/io';
-import * as tc from '@actions/tool-cache';
+import { ApiClient, ApiClientConfiguration, ApiError, ApiService } from '@pulumi/cloud-sdk';
+import { Configuration, EscRawApi, type Value } from '@pulumi/esc-sdk';
+import axios, { type AxiosInstance, isAxiosError } from 'axios';
+import * as axiosRetryModule from 'axios-retry';
+import { randomBytes } from 'crypto';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import * as rt from 'runtypes';
-import {
-    type OidcLoginConfig,
-    OidcLoginConfigRuntype,
-    ensureAccessToken,
-} from '@pulumi/actions-helpers/auth';
-import * as axiosRetryModule from 'axios-retry';
-import axios from 'axios';
-import { parseDetailedEnvironmentVariables, type DetailedEnvironment } from './parse-detailed.js';
-import { parseDotenv } from './parse-dotenv.js';
-import { fetchLatestVersion } from './latest-version.js';
-import { parseKeysList, parseExportMappings } from './parse-mapping.js';
+import { resolveDefaultOrg } from './default-org.js';
+import { parseScalars } from './parse-properties.js';
+import { parseEnvironmentRef, type EnvironmentRef } from './parse-ref.js';
+import { parseExportMappings } from './parse-mapping.js';
 
 // axios-retry v4 exports as CJS, need to access default export
 const axiosRetry = (axiosRetryModule as any).default || axiosRetryModule;
-const { exponentialDelay, isNetworkOrIdempotentRequestError } = axiosRetryModule;
+const { exponentialDelay, isNetworkError } = axiosRetryModule;
 
-function getInput(name: string, envVar: string, required?: boolean): string | undefined {
-    const val = core.getInput(name) || process.env[`ESC_ACTION_${envVar}`];
-    if (!val && required) {
-        throw new Error(`Input or environment variable required and not supplied: ${name} (${envVar})`);
-    }
-    core.info(`input ${name} or ESC_ACTION_${envVar}: ${val}`);
-    return val;
+const DEFAULT_CLOUD_URL = 'https://api.pulumi.com';
+
+function getInput(name: string, envVar: string): string | undefined {
+    const val = core.getInput(name) || process.env[envVar];
+    return val || undefined;
 }
 
 function parseBooleanValue(val: string): boolean {
@@ -45,53 +37,31 @@ function parseBooleanValue(val: string): boolean {
         `Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
 }
 
-function getBooleanInput(name: string, envVar: string, required?: boolean): boolean | undefined {
-    const val = getInput(name, envVar, required);
-    if (!val) {
-        return undefined;
-    }
-    return parseBooleanValue(val);
-}
-
-function getNumberInput(name: string, envVar: string, required?: boolean): number | undefined {
-    const val = getInput(name, envVar, required);
-    if (!val) {
-        return undefined;
-    }
-    const parsedVal = Number(val);
-    if (Number.isNaN(parsedVal)) {
-        throw new Error('Input was not a number');
-    }
-    return parsedVal || undefined;
-}
-
-function getOidcLoginConfig(cloudUrl: string): rt.Result<OidcLoginConfig> {
-    return OidcLoginConfigRuntype.validate({
-        organizationName: getInput('oidc-organization', 'OIDC_ORGANIZATION', true)!,
-        requestedTokenType: getInput('oidc-requested-token-type', 'OIDC_REQUESTED_TOKEN_TYPE', true)!,
-        scope: getInput('oidc-scope', 'OIDC_SCOPE') || undefined,
-        expiration: getNumberInput('oidc-token-expiration', 'OIDC_TOKEN_EXPIRATION') || undefined,
-        cloudUrl: cloudUrl || 'https://api.pulumi.com',
-        exportEnvironmentVariables: false,
-    });
-}
-
-function getExportEnvironmentVariables(keys: string | undefined): [Record<string, string>, boolean] {
-    const exportAll = !keys;
-    const keysMapping = keys
-        ? Object.fromEntries(parseKeysList(keys).map(k => [k, k]))
-        : {};
-
-    // If no value is present for keys, default to pulling mappings from keys.
-    const input = getInput('export-environment-variables', 'EXPORT_ENVIRONMENT_VARIABLES');
-    if (!input) {
-        return [keysMapping, exportAll]
-    }
-
-    // If the value is a boolean true or false, return it with the mappings from keys.
+function parseCloudUrl(input: string | undefined): string {
+    const raw = input || DEFAULT_CLOUD_URL;
+    let url: URL;
     try {
-        const exportAny = parseBooleanValue(input);
-        return !exportAny ? [{}, false] : [keysMapping, exportAll];
+        url = new URL(raw);
+    } catch {
+        throw new Error(`Invalid cloud-url "${raw}": not an absolute URL`);
+    }
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+        throw new Error(`Invalid cloud-url "${raw}": the scheme must be http or https`);
+    }
+    return url.toString().replace(/\/+$/, '');
+}
+
+// Returns the requested mapping of exported envvar name to ESC envvar name, and
+// whether unmapped ESC envvars are also exported under their own name.
+function getExportEnvironmentVariables(): [Record<string, string>, boolean] {
+    const input = getInput('export-environment-variables', 'ESC_ACTION_EXPORT_ENVIRONMENT_VARIABLES');
+    if (!input) {
+        return [{}, true];
+    }
+
+    // If the value is a boolean, export all or nothing.
+    try {
+        return [{}, parseBooleanValue(input)];
     } catch { }
 
     // Otherwise, parse the value as a list of [FOO=]BAR key-value pairs, where FOO is the name of the envvar to set and
@@ -115,230 +85,138 @@ function getExportEnvironmentVariables(keys: string | undefined): [Record<string
     return parseExportMappings(input);
 }
 
-async function getInstalledVersion(): Promise<string | undefined> {
-    const installed = await io.which('pulumi');
-    if (!installed) {
-        return undefined;
-    }
-
-    // Return version without 'v' prefix
-    const { exitCode, stdout } = await exec.getExecOutput('pulumi', ['version']);
-    if (exitCode === 0 && stdout.trim().startsWith('v')) {
-        return stdout.trim().substring(1);
-    }
-
-    return undefined;
+// Create an HTTP client that retries transient failures. The POST that opens an environment is retried too: a
+// duplicate open only leaves an extra session that expires on its own.
+function newHttpClient(): AxiosInstance {
+    const http = axios.create();
+    axiosRetry(http, {
+        retries: 5,
+        retryDelay: exponentialDelay,
+        retryCondition: (error: any) => {
+            const status = error.response?.status;
+            return isNetworkError(error) || status === 429 || (status !== undefined && status >= 500);
+        },
+        onRetry: (retryCount: number, error: any, requestConfig: any) => {
+            core.info(`Retrying ${requestConfig.method?.toUpperCase()} ${requestConfig.url} (attempt ${retryCount}/5): ${error.message}`);
+        },
+    });
+    return http;
 }
 
-async function install(version: string): Promise<void> {
-    const installedVersion = await getInstalledVersion();
-    if (installedVersion === version) {
-        core.info('Pulumi CLI is already installed, skipping installation step.');
-        return;
+function describeError(error: unknown): string {
+    if (error instanceof ApiError) {
+        return `${error.url}: ${error.message}`;
     }
-
-    core.startGroup(`Installing Pulumi CLI v${version}`);
-    if (installedVersion) {
-        core.info(`Already-installed Pulumi CLI is not version ${version}`);
+    if (!isAxiosError(error)) {
+        return error instanceof Error ? error.message : String(error);
     }
-
-    const destination = path.join(os.homedir(), '.pulumi', 'bin');
-    core.info(`Install destination is ${destination}`);
-
-    await io.mkdirP(destination);
-    core.debug(`Successfully created ${destination}`);
-
-    const [platform, arch, ext] = core.platform.platform === 'win32' ? ['windows', 'x64', 'zip'] : [core.platform.platform, core.platform.arch, 'tar.gz'];
-    const downloadURL = `https://get.pulumi.com/releases/sdk/pulumi-v${version}-${platform}-${arch}.${ext}`;
-    core.info(`downloading ${downloadURL}`);
-    const downloaded = await tc.downloadTool(downloadURL);
-    core.info(`successfully downloaded ${downloadURL} to ${downloaded}`);
-
-    const [extract, srcDir] = platform === 'windows' ? [tc.extractZip, path.join('pulumi', 'bin')] : [tc.extractTar, 'pulumi'];
-    const extractedPath = await extract(downloaded);
-    core.info(`Successfully extracted ${downloaded} to ${extractedPath}`);
-    const binDir = path.join(extractedPath, srcDir);
-    await io.cp(binDir, destination, { recursive: true, copySourceDirectory: false });
-    core.info(`Successfully moved ${binDir} to ${destination}`);
-
-    const binName = platform === 'windows' ? 'pulumi.exe' : 'pulumi';
-    if (!fs.existsSync(path.join(destination, binName))) {
-        throw new Error(`Pulumi CLI install failed: ${binName} not found in ${destination} after extracting ${downloadURL}`);
+    const request = `${error.config?.method?.toUpperCase()} ${error.config?.url}`;
+    if (!error.response) {
+        return `${request} failed: ${error.message}`;
     }
-
-    const cachedPath = await tc.cacheDir(destination, 'pulumi', version);
-    core.addPath(cachedPath);
-
-    core.endGroup();
+    const data = error.response.data;
+    const detail = typeof data?.message === 'string' ? data.message : JSON.stringify(data);
+    return `${request} failed with status ${error.response.status}: ${detail}`;
 }
 
-const DETAILED_FORMAT_MIN_VERSION = '3.255.0';
+async function openEnvironment(
+    http: AxiosInstance,
+    cloudUrl: string,
+    accessToken: string,
+    ref: EnvironmentRef & { org: string },
+): Promise<Record<string, Value> | undefined> {
+    // The SDK is a CommonJS package, so it sees axios's CommonJS type declarations while this ES module sees the ESM
+    // ones. Both describe the same runtime object, but TypeScript treats them as unrelated types.
+    const sdkHttp = http as unknown as ConstructorParameters<typeof EscRawApi>[2];
+    const api = new EscRawApi(new Configuration({ accessToken, basePath: `${cloudUrl}/api/esc` }), undefined, sdkHttp);
 
-// Whether the CLI version supports secret markers in the detailed format.
-export function supportsDetailedFormat(version: string): boolean {
-    // Strip the leading 'v' and any prerelease/build metadata, leaving major.minor.patch.
-    const core = (v: string) => v.trim().replace(/^v/, '').split(/[-+]/)[0];
-
-    const actual = core(version);
-    // A version we can't parse is assumed to be too old, so we fall back to the legacy format.
-    if (!/^\d+\.\d+\.\d+$/.test(actual)) {
-        return false;
+    const { org, project, env, version } = ref;
+    const { data: open } = version
+        ? await api.openEnvironmentAtVersion(org, project, env, version)
+        : await api.openEnvironment(org, project, env);
+    if (!open.id) {
+        throw new Error(`Opening the environment returned no session: ${JSON.stringify(open.diagnostics ?? open)}`);
     }
 
-    return actual.localeCompare(core(DETAILED_FORMAT_MIN_VERSION), 'en', { numeric: true }) >= 0;
+    const { data } = await api.readOpenEnvironment(org, project, env, open.id);
+    return data.properties;
 }
 
-// Open the environment with the detailed format
-async function openEnvironment(environment: string): Promise<DetailedEnvironment> {
-    const result = await exec.getExecOutput(
-        'pulumi',
-        ['env', 'open', environment, '--format', 'detailed'],
-        { silent: true, ignoreReturnCode: true }
-    );
-
-    if (result.exitCode !== 0) {
-        throw new Error(`\`pulumi env open\` command failed:
-${result.stderr}`)
+// Write each file to a new temporary file that only the current user can read, and return the path for each key.
+function writeTemporaryFiles(files: Record<string, string>): Record<string, string> {
+    const dir = process.env.RUNNER_TEMP || os.tmpdir();
+    const paths: Record<string, string> = {};
+    for (const [key, content] of Object.entries(files)) {
+        const file = path.join(dir, `esc-${randomBytes(8).toString('hex')}`);
+        fs.writeFileSync(file, content, { flag: 'wx', mode: 0o600 });
+        paths[key] = file;
     }
-
-    return parseDetailedEnvironmentVariables(result.stdout);
-}
-
-async function openEnvironmentLegacy(environment: string): Promise<DetailedEnvironment> {
-    const result = await exec.getExecOutput(
-        'pulumi',
-        ['env', 'open', environment, '--format', 'dotenv'],
-        { silent: true, ignoreReturnCode: true }
-    );
-
-    if (result.exitCode !== 0) {
-        throw new Error(`\`pulumi env open\` command failed:
-${result.stderr}`)
-    }
-
-    const values = parseDotenv(result.stdout);
-    return { values, secrets: new Set(Object.keys(values)) };
+    return paths;
 }
 
 async function run(): Promise<void> {
     try {
-        // Configure axios with automatic retry for network errors
-        axiosRetry(axios, {
-            retries: 5,
-            retryDelay: exponentialDelay,
-            retryCondition: (error: any) => {
-                // Retry on network errors (no response) and idempotent request errors
-                return isNetworkOrIdempotentRequestError(error);
-            },
-            onRetry: (retryCount: number, error: any, requestConfig: any) => {
-                core.info(
-                    `Retrying ${requestConfig.url} (attempt ${retryCount}/5): ${error.message}`
-                );
-            },
-        });
+        const environment = getInput('environment', 'ESC_ACTION_ENVIRONMENT');
+        if (!environment) {
+            throw new Error('Input or environment variable required and not supplied: environment (ESC_ACTION_ENVIRONMENT)');
+        }
+        const ref = parseEnvironmentRef(environment);
+        const cloudUrl = parseCloudUrl(getInput('cloud-url', 'ESC_ACTION_CLOUD_URL'));
+        const [mapping, allVars] = getExportEnvironmentVariables();
 
-        // Parse inputs
-        const pulumiVersion: string = getInput('version', 'VERSION') || await fetchLatestVersion();
-        const environment = getInput('environment', 'ENVIRONMENT');
-        const keys = getInput('keys', 'KEYS');
-        const cloudUrl = getInput('cloud-url', 'CLOUD_URL') || 'https://api.pulumi.com';
-        const [mapping, allVars] = getExportEnvironmentVariables(keys);
+        const accessToken = getInput('pulumi-access-token', 'PULUMI_ACCESS_TOKEN');
+        if (!accessToken) {
+            throw new Error('A Pulumi access token is required: set the pulumi-access-token input or PULUMI_ACCESS_TOKEN');
+        }
+        core.setSecret(accessToken);
 
-        const useOidcAuth = getBooleanInput('oidc-auth', 'OIDC_AUTH');
-        if (useOidcAuth) {
-            const oidcConfig = getOidcLoginConfig(cloudUrl);
-            if (!oidcConfig.success) {
-                throw new Error('Invalid OIDC configuration');
-            }
-            const accessToken = await ensureAccessToken(oidcConfig.value);
-            core.setSecret(accessToken);
-            process.env.PULUMI_ACCESS_TOKEN = accessToken;
+        const http = newHttpClient();
+        const cloud = new ApiService(new ApiClient(new ApiClientConfiguration(`${cloudUrl}/api/`, 'esc-action', () => accessToken)));
+        const org = ref.org ?? (await resolveDefaultOrg(cloud.Users));
+
+        core.startGroup(`Opening ESC environment: ${org}/${ref.project}/${ref.env}${ref.version ? `@${ref.version}` : ''}`);
+        const properties = await openEnvironment(http, cloudUrl, accessToken, { ...ref, org });
+
+        const { values, secrets } = parseScalars(properties, 'environmentVariables');
+        const files = parseScalars(properties, 'files');
+        for (const key of files.secrets) {
+            core.setSecret(files.values[key]);
+        }
+        // Like the Pulumi CLI, a file replaces an environment variable of the same name. The path is not secret.
+        for (const [key, file] of Object.entries(writeTemporaryFiles(files.values))) {
+            values[key] = file;
+            secrets.delete(key);
         }
 
-        /*
-          Install the Pulumi CLI (either the latest or a specific version).
-
-          ESC functionality is exposed through the `pulumi env`
-          subcommands of the Pulumi CLI, so we download the CLI
-          release archive directly. If no version is specified, the latest is
-          installed automatically.
-        */
-        await install(pulumiVersion);
-
-        if (cloudUrl) {
-            // Set the ESC_CLOUD_URL environment variable if provided
-            core.info(`Setting PULUMI_BACKEND_URL to ${cloudUrl}`);
-            process.env.PULUMI_BACKEND_URL = cloudUrl;
+        // Populate step outputs, masking only secret values so they do not
+        // appear in logs while non-secret values remain readable.
+        for (const [key, value] of Object.entries(values)) {
+            if (secrets.has(key)) {
+                core.setSecret(value);
+            }
+            core.setOutput(key, value);
         }
 
-        // Inject environment variables if requested
-        //
-        // Check if an environment was provided. If not, skip injection.
-        if (environment) {
-            core.startGroup(`Opening ESC environment: ${environment}`);
-
-            const useDetailed = supportsDetailedFormat(pulumiVersion);
-            if (!useDetailed) {
-                core.info(
-                    `Pulumi CLI v${pulumiVersion} is older than v${DETAILED_FORMAT_MIN_VERSION}; ` +
-                    `using the dotenv format and masking all values.`
-                );
+        // Calculate the final set of mappings. If allVars is true, add identity mappings for all unmapped variables;
+        // otherwise, just use the user's mappings.
+        if (allVars) {
+            const mapped = new Set(Object.values(mapping));
+            for (const k of Object.keys(values).filter(k => !mapped.has(k))) {
+                mapping[k] = k;
             }
-
-            const { values: dotenv, secrets } = useDetailed
-                ? await openEnvironment(environment)
-                : await openEnvironmentLegacy(environment);
-
-            // Populate step outputs, masking only secret values so they do not
-            // appear in logs while non-secret values remain readable.
-            for (const [key, value] of Object.entries(dotenv)) {
-                if (secrets.has(key)) {
-                    core.setSecret(value);
-                }
-                core.setOutput(key, value);
-            }
-
-            // Calculate the final set of mappings. If allVars is true, add identity mappings for all unmapped variables;
-            // otherwise, just use the user's mappings.
-			if (allVars) {
-				const mapped = new Set(Object.values(mapping));
-				for (const k of Object.keys(dotenv).filter(k => !mapped.has(k))) {
-					mapping[k] = k;
-				}
-			}
-
-            // Export envvars.
-            if (Object.keys(mapping).length != 0) {
-                const envFilePath = process.env.GITHUB_ENV;
-                if (!envFilePath) {
-                    throw new Error('GITHUB_ENV is not defined. Cannot append environment variables.');
-                }
-
-                for (const [to, from] of Object.entries(mapping)) {
-                    const value = dotenv[from];
-                    if (value) {
-                        // Append in multiline syntax to handle any newlines safely
-                        // e.g.: MY_ENV_VAR<<EOF
-                        // line1
-                        // line2
-                        // EOF
-                        fs.appendFileSync(envFilePath, `${to}<<PULUMIESCEOF\n${value}\nPULUMIESCEOF\n`);
-                        core.info(`Injected ${to}=${from}`);
-                    } else {
-                        core.warning(`No value found for ${to}=environmentVariables.${from}`);
-                    }
-                }
-                core.info(`Injected ${Object.keys(mapping).length} environment variables`);
-            }
-
-            core.endGroup();
         }
+
+        for (const [to, from] of Object.entries(mapping)) {
+            if (!(from in values)) {
+                core.warning(`No value found for ${to}=environmentVariables.${from}`);
+                continue;
+            }
+            core.exportVariable(to, values[from]);
+            core.info(`Injected ${to}=${from}`);
+        }
+        core.endGroup();
     } catch (error) {
-        if (error instanceof Error) {
-            core.setFailed(error.message);
-        } else {
-            core.setFailed(String(error));
-        }
+        core.setFailed(describeError(error));
     }
 }
 

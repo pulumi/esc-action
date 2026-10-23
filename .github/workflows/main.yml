@@ -18,67 +18,6 @@ jobs:
         run: npm ci
       - name: Run unit tests
         run: npm test
-  test-cli-download-only:
-    strategy: {matrix: {os: [ubuntu-latest, windows-latest]}}
-    runs-on: ${{ matrix.os }}
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-      - name: Install Pulumi CLI
-        uses: ./
-      - name: Verify CLI exists
-        run: pulumi version
-  test-cli-download-specific-version:
-    strategy: {matrix: {os: [ubuntu-latest, windows-latest]}}
-    runs-on: ${{ matrix.os }}
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-      - name: Install Pulumi CLI
-        uses: ./
-        with:
-          version: '3.246.0'
-      - name: Verify CLI exists
-        run: pulumi version
-  test-individual-keys:
-    strategy: {matrix: {os: [ubuntu-latest]}}
-    runs-on: ${{ matrix.os }}
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-      - name: Authenticate with Pulumi Cloud
-        uses: pulumi/auth-actions@v1
-        with:
-          organization: pulumi
-          requested-token-type: urn:pulumi:token-type:access_token:organization
-          cloud-url: https://api.pulumi-staging.io
-      - name: Install ESC and open an environment
-        id: esc
-        uses: ./
-        with:
-          environment: 'pulumi/github/esc-action'
-          keys: 'FOO,SOME_IMPORTANT_KEY'
-          cloud-url: https://api.pulumi-staging.io
-          export-environment-variables: false
-      - name: Verify injection
-        run: |
-          echo "Testing env injection..."
-          REQUIRED_VARS=("K1" "K2")
-          for var in "${REQUIRED_VARS[@]}"; do
-            if [[ -z "${!var}" ]]; then
-              echo "Error: $var is not set or empty" >&2
-              exit 1
-            fi
-            echo "$var is set to: ${!var}"
-          done
-          if [[ -n $(env | grep "^\(FOO\|SOME_IMPORTANT_KEY\|TEST_ENV\)=") ]]; then
-            echo "Error: unexpected variables are set" >&2
-            env
-            exit 1
-          fi
-        env:
-          K1: ${{ steps.esc.outputs.FOO }}
-          K2: ${{ steps.esc.outputs.SOME_IMPORTANT_KEY }}
   test-all-keys:
     strategy: {matrix: {os: [ubuntu-latest]}}
     runs-on: ${{ matrix.os }}
@@ -91,7 +30,7 @@ jobs:
           organization: pulumi
           requested-token-type: urn:pulumi:token-type:access_token:organization
           cloud-url: https://api.pulumi-staging.io
-      - name: Install ESC and open an environment
+      - name: Open an environment
         id: esc
         uses: ./
         with:
@@ -136,7 +75,7 @@ jobs:
         uses: ./
         with:
           environment: 'pulumi/github/esc-action'
-          keys: 'FOO,SOME_IMPORTANT_KEY'
+          export-environment-variables: 'FOO,SOME_IMPORTANT_KEY'
           cloud-url: https://api.pulumi-staging.io
       - name: Verify injection
         run: |
@@ -194,7 +133,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       ESC_ACTION_ENVIRONMENT: pulumi/github/esc-action
-      ESC_ACTION_KEYS: FOO,SOME_IMPORTANT_KEY
+      ESC_ACTION_EXPORT_ENVIRONMENT_VARIABLES: FOO,SOME_IMPORTANT_KEY
       ESC_ACTION_CLOUD_URL: https://api.pulumi-staging.io
     steps:
       - name: Check out repository
@@ -205,7 +144,7 @@ jobs:
           organization: pulumi
           requested-token-type: urn:pulumi:token-type:access_token:organization
           cloud-url: https://api.pulumi-staging.io
-      - name: Install and inject ESC environment variables
+      - name: Inject ESC environment variables
         uses: ./
       - name: Verify injection
         run: |
@@ -235,7 +174,7 @@ jobs:
           organization: pulumi
           requested-token-type: urn:pulumi:token-type:access_token:organization
           cloud-url: https://api.pulumi-staging.io
-      - name: Install and inject ESC environment variables
+      - name: Inject ESC environment variables
         uses: ./
         with:
           # This action uses the https://app.pulumi-staging.io/pulumi/esc/github/esc-action environment
@@ -264,7 +203,7 @@ jobs:
           organization: pulumi
           requested-token-type: urn:pulumi:token-type:access_token:organization
           cloud-url: https://api.pulumi-staging.io
-      - name: Install and inject ESC environment variables
+      - name: Inject ESC environment variables
         uses: ./
         with:
           # This action uses the https://app.pulumi-staging.io/pulumi/esc/github/esc-action environment
@@ -287,18 +226,63 @@ jobs:
             env
             exit 1
           fi
-  test-oidc-config:
+  test-token-input:
     strategy: {matrix: {os: [ubuntu-latest]}}
     runs-on: ${{ matrix.os }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-      - name: Install and inject ESC environment variables
+      - name: Authenticate with Pulumi Cloud
+        id: auth
+        uses: pulumi/auth-actions@v1
+        with:
+          organization: pulumi
+          requested-token-type: urn:pulumi:token-type:access_token:organization
+          cloud-url: https://api.pulumi-staging.io
+      - name: Inject ESC environment variables
         uses: ./
         with:
           # This action uses the https://app.pulumi-staging.io/pulumi/esc/github/esc-action environment
-          oidc-auth: true
-          oidc-organization: pulumi
-          oidc-requested-token-type: urn:pulumi:token-type:access_token:organization
           environment: 'pulumi/github/esc-action'
           cloud-url: https://api.pulumi-staging.io
+          pulumi-access-token: ${{ steps.auth.outputs.pulumi-access-token }}
+        env:
+          # The open fails with this token, so it passes only if the action uses the input.
+          PULUMI_ACCESS_TOKEN: pul-invalid
+      - name: Verify injection
+        run: |
+          if [[ -z "$FOO" ]]; then
+            echo "Error: FOO is not set or empty" >&2
+            exit 1
+          fi
+          echo "FOO is set to: $FOO"
+  test-default-org:
+    strategy: {matrix: {os: [ubuntu-latest]}}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Authenticate with Pulumi Cloud
+        uses: pulumi/auth-actions@v1
+        with:
+          organization: pulumi
+          requested-token-type: urn:pulumi:token-type:access_token:organization
+          cloud-url: https://api.pulumi-staging.io
+      - name: Inject ESC environment variables
+        uses: ./
+        with:
+          # The default org of a `pulumi` org token is `pulumi`, so this opens
+          # https://app.pulumi-staging.io/pulumi/esc/github/esc-action
+          environment: 'github/esc-action'
+          cloud-url: https://api.pulumi-staging.io
+      - name: Verify injection
+        run: |
+          echo "Testing env injection..."
+          REQUIRED_VARS=("FOO" "SOME_IMPORTANT_KEY" "TEST_ENV")
+          for var in "${REQUIRED_VARS[@]}"; do
+            if [[ -z "${!var}" ]]; then
+              echo "Error: $var is not set or empty" >&2
+              exit 1
+            fi
+            echo "$var is set to: ${!var}"
+          done

@@ -8,23 +8,34 @@ With ESC's support for dynamic credentials and automatic secret rotation, you ca
 
 ## Functionality
 
-- If no inputs are passed, this action will download the latest version of the Pulumi CLI for direct use in later steps of the workflow. ESC functionality is provided by the `pulumi env` subcommands.
-- If a version is specified, that specific version of the Pulumi CLI will be downloaded.
-- If an `environment` is passed in as an input, the action will inject all environment variables (specifically the keys under `environmentVariables` and projected files under `files`) from the environment into the current action/workflow environment.
-- If mappings are passed via the `export-environment-variables` input - only the mapped secrets from the environment's `environmentVariables` or `files` objects will be injected into the current action.
-- All secrets from the environment's `environmentVariable` and `files` objects are available as step outputs
+- The action opens the ESC `environment` through the Pulumi Cloud API.
+- The action writes each value under the environment's `files` object to a temporary file. The environment variable with the same key holds the path to that file. If a key is in both `environmentVariables` and `files`, the file path wins.
+- All environment variables (the keys under `environmentVariables`, and the file paths) are available as step outputs.
+- By default, the action exports all environment variables to the later steps of the job. The `export-environment-variables` input selects which ones to export.
+
+To install the Pulumi CLI, use [pulumi/actions](https://github.com/pulumi/actions). To get a Pulumi access token through OIDC, use [pulumi/auth-actions](https://github.com/pulumi/auth-actions).
 
 ## Inputs
 
 _NOTE_: All parameters can be passed via environment variables as well as inputs. If a parameter is present as an input and an environment variable, the input is preferred.
 
-### `version` (`ESC_ACTION_VERSION`)
-
-**Optional** The version of the Pulumi CLI to download (e.g. `3.246.0`). If not specified, the latest version will be downloaded.
-
 ### `environment` (`ESC_ACTION_ENVIRONMENT`)
 
-**Optional** The name of the environment to open. If not specified, the action will not open an environment.
+**Required** The name of the environment to open. The name takes one of these forms:
+
+| Form                            | Example                    | Opens                             |
+|---------------------------------|----------------------------|-----------------------------------|
+| `<environment>`                 | `my-env`                   | `<default org>/default/my-env`    |
+| `<project>/<environment>`       | `my-project/my-env`        | `<default org>/my-project/my-env` |
+| `<org>/<project>/<environment>` | `my-org/my-project/my-env` | `my-org/my-project/my-env`        |
+
+Each form can end with `@<version>`, where the version is a revision number or a tag. For example, `my-org/my-project/my-env@stable` opens the revision with the `stable` tag.
+
+The default org is the first one of these that is set:
+
+1. The `PULUMI_DEFAULT_ORGANIZATION` environment variable.
+2. The default org that Pulumi Cloud selects for the access token.
+3. The name of the user that owns the access token.
 
 ### `cloud-url` (`ESC_ACTION_CLOUD_URL`)
 
@@ -57,52 +68,16 @@ export-environment-variables: |
   LAST_KEY
 ```
 
-### `oidc-auth` (`ESC_ACTION_OIDC_AUTH`)
+### `pulumi-access-token` (`PULUMI_ACCESS_TOKEN`)
 
-**Optional** When this input is `true`, the ESC action will exchange the GitHub workflow's OIDC token for a Pulumi Access Token. This token is not available to other steps. Requires `id-token: write` permission.
-
-### `oidc-organization` (`ESC_ACTION_OIDC_ORGANIZATION`)
-
-**Optional** The name of the Pulumi organization to use for OIDC token exchange. Required if `oidc-auth` is true.
-
-### `oidc-requested-token-type` (`ESC_ACTION_OIDC_REQUESTED_TOKEN_TYPE`)
-
-**Optional** The type of Pulumi Access Token to obtain. Required if `oidc-auth` is true.
-
-### `oidc-scope` (`ESC_ACTION_OIDC_SCOPE`)
-
-**Optional** The requested scopes for the Pulumi Access Token.
-
-### `oidc-token-expiration` (`ESC_ACTION_OIDC_TOKEN_EXPIRATION`)
-
-**Optional** The time-to-live for the Pulumi Access Token.
-
-## Deprecated inputs
-
-### `keys` (`ESC_ACTION_KEYS`)
-
-**Optional** (_Deprecated in favor of export-environment-variables_) A comma-separated list of keys to inject into the current action/workflow environment. If not specified, all keys from the environment will be injected.
+**Optional** The Pulumi access token to use. If not specified, the action uses the `PULUMI_ACCESS_TOKEN` environment variable. If neither is set, the action fails.
 
 ## Example usage
-
-### Download the latest version of the Pulumi CLI
-
-```yaml
-uses: pulumi/esc-action@v3
-```
-
-### Download a specific version of the Pulumi CLI
-
-```yaml
-uses: pulumi/esc-action@v3
-with:
-  version: 3.246.0
-```
 
 ### Open an environment and inject all environment variables
 
 ```yaml
-uses: pulumi/esc-action@v3
+uses: pulumi/esc-action@v4
 with:
   environment: my-org/my-project/my-env
 env:
@@ -112,7 +87,7 @@ env:
 ### Open an environment and inject specific environment variables
 
 ```yaml
-uses: pulumi/esc-action@v3
+uses: pulumi/esc-action@v4
 with:
   environment: my-org/my-project/my-env
   export-environment-variables: SOME_KEY,ANOTHER_KEY,LAST_KEY
@@ -122,7 +97,7 @@ env:
 
 ### Example using pulumi/auth-actions for authentication
 
-It is recommended to use OIDC to authenticate with the Pulumi Cloud API. This can be done via the ESC action's own OIDC configuration or using the [pulumi/auth-actions](https://github.com/pulumi/auth-actions) action to authenticate with the Pulumi Cloud API. This action can automatically set the `PULUMI_ACCESS_TOKEN` environment variable for you.
+It is recommended to use OIDC to authenticate with the Pulumi Cloud API. The [pulumi/auth-actions](https://github.com/pulumi/auth-actions) action exchanges the workflow's OIDC token for a Pulumi access token and sets the `PULUMI_ACCESS_TOKEN` environment variable for you.
 
 ```yaml
 on:
@@ -143,8 +118,8 @@ jobs:
         with:
           organization: pulumi
           requested-token-type: urn:pulumi:token-type:access_token:organization
-      - name: Install and inject ESC environment variables
-        uses: pulumi/esc-action@v3
+      - name: Inject ESC environment variables
+        uses: pulumi/esc-action@v4
         with:
           environment: 'pulumi/github/esc-action'
       - name: Verify environment variables were injected
@@ -155,36 +130,64 @@ jobs:
           echo "TEST_ENV=$TEST_ENV"
 ```
 
+To give this action a token directly, pass it to the `pulumi-access-token` input. The input takes precedence over `PULUMI_ACCESS_TOKEN`:
+
+```yaml
+- name: Authenticate with Pulumi Cloud
+  id: auth
+  uses: pulumi/auth-actions@v1
+  with:
+    organization: my-org
+    requested-token-type: urn:pulumi:token-type:access_token:organization
+- uses: pulumi/esc-action@v4
+  with:
+    environment: my-org/my-project/my-env
+    pulumi-access-token: ${{ steps.auth.outputs.pulumi-access-token }}
+```
+
 ### Example using workflow environment variables for global configuration
 
 ```yaml
 on: [pull_request]
 
-permissions:
-  id-token: write
-
 env:
   ESC_ACTION_ENVIRONMENT: my-org/github/secrets
   ESC_ACTION_EXPORT_ENVIRONMENT_VARIABLES: AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,AWS_SESSION_TOKEN
-  ESC_ACTION_OIDC_AUTH: true
-  ESC_ACTION_OIDC_ORGANIZATION: my-org
-  ESC_ACTION_OIDC_REQUESTED_TOKEN_TYPE: urn:pulumi:token-type:access_token:organization
+  PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
 
 jobs:
   job-1:
     runs-on: ubuntu-latest
     steps:
-      - name: Fetch secrets from ESC
-        id: esc-secrets
-        uses: pulumi/esc-action@v3
-      - name: pulumi up
-        run: pulumi up
-        env:
-          PULUMI_ACCESS_TOKEN: ${{ steps.esc-secrets.outputs.ORG_TOKEN }}
-  job-2:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: pulumi/esc-action@v3
+      - uses: pulumi/esc-action@v4
       - name: list buckets
         run: aws s3 ls
 ```
+
+## Migrating from v3
+
+v4 talks directly with the Pulumi Cloud API.
+
+- **The action does not install the Pulumi CLI.** If a later step runs `pulumi`, add [pulumi/actions](https://github.com/pulumi/actions) to install it. The `version` input is removed.
+
+  ```yaml
+  - uses: pulumi/esc-action@v4
+    with:
+      environment: my-org/my-project/my-env
+  - uses: pulumi/actions@v7
+  ```
+
+- **The OIDC inputs are removed.** Remove `oidc-auth`, `oidc-organization`, `oidc-requested-token-type`, `oidc-scope` and `oidc-token-expiration`. Use [pulumi/auth-actions](https://github.com/pulumi/auth-actions) before this action instead. Its inputs have the same meaning:
+
+  | v3 input                    | pulumi/auth-actions input |
+  |-----------------------------|---------------------------|
+  | `oidc-organization`         | `organization`            |
+  | `oidc-requested-token-type` | `requested-token-type`    |
+  | `oidc-scope`                | `scope`                   |
+  | `oidc-token-expiration`     | `token-expiration`        |
+
+- **The `keys` input is removed.** Use `export-environment-variables` with the same list.
+- **The `environment` input is required.** To only install the Pulumi CLI, use [pulumi/actions](https://github.com/pulumi/actions).
+- **A 2-part name is always `<project>/<environment>`.** In v3, the Pulumi CLI also read a 2-part name as the legacy `<org>/<environment>` form, which is `<org>/default/<environment>`. v4 does not. If you use the legacy form, change it to the 3-part form `<org>/default/<environment>`. If you do not, v4 looks for a project with your org's name in your default org, and the open fails.
+- **The action does not read `~/.pulumi/credentials.json`.** A `pulumi login` in an earlier step does not authenticate this action. Set `PULUMI_ACCESS_TOKEN` or the `pulumi-access-token` input.
+- **File paths are not masked.** In v3, the path of a secret file was masked in the logs. The contents of a secret file are still masked.
