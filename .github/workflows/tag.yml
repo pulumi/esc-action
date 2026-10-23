@@ -1,0 +1,14 @@
+name: Move the major version tag
+on:
+  release:
+    types: [published, edited]
+permissions:
+  contents: write
+jobs:
+  tag-major:
+    name: Push major-release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: Actions-R-Us/actions-tagger@330ddfac760021349fef7ff62b372f2f691c20fb # v2.0.3
+        with:
+          publish_latest_tag: false
