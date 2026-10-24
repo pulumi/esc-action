@@ -112,9 +112,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Authenticate with Pulumi Cloud
-        uses: pulumi/auth-actions@v1
+        uses: pulumi/auth-actions@v2
         with:
           organization: pulumi
           requested-token-type: urn:pulumi:token-type:access_token:organization
@@ -135,7 +135,7 @@ To give this action a token directly, pass it to the `pulumi-access-token` input
 ```yaml
 - name: Authenticate with Pulumi Cloud
   id: auth
-  uses: pulumi/auth-actions@v1
+  uses: pulumi/auth-actions@v2
   with:
     organization: my-org
     requested-token-type: urn:pulumi:token-type:access_token:organization
